@@ -1,7 +1,6 @@
 import { supabase } from './supabaseClient';
 
 export const register = async (userData) => {
-  // 1. Cria o usuário no Supabase Auth
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: userData.email,
     password: userData.password,
@@ -9,16 +8,19 @@ export const register = async (userData) => {
 
   if (authError) throw authError;
 
-  // 2. Se o usuário foi criado, insere os dados extras na tabela 'pessoa'
   if (authData.user) {
+    // AJUSTE AQUI: Se o CPF for apenas espaços ou vazio, vira null
+    const cpfFinal = userData.cpf?.trim() === "" ? null : userData.cpf;
+
     const { error: dbError } = await supabase
       .from('pessoa')
       .insert([
         {
-          id: authData.user.id, // Vincula o ID da autenticação com a tabela
+          id_pessoa: authData.user.id,
           nome: userData.nome,
-          cpf: userData.cpf,
-          role: userData.papel,
+          email: userData.email,
+          cpf: cpfFinal, // Agora enviamos null se estiver vazio
+          papel: userData.papel,
         },
       ]);
 

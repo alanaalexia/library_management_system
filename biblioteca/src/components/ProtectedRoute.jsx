@@ -15,11 +15,11 @@ const ProtectedRoute = ({ user, requiredRole, children }) => {
       
       const { data, error } = await supabase
         .from('pessoa')
-        .select('role')
-        .eq('id', user.id)
+        .select('papel')
+        .eq('id_pessoa', user.id)
         .single();
 
-      if (!error) setRole(data.role);
+      if (!error) setRole(data.papel);
       setLoading(false);
     };
 
