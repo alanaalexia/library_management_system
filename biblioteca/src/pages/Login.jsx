@@ -3,7 +3,10 @@ import { useAuth } from "../hooks/useAuth";
 import { GoogleIcon, MetaIcon, AppleIcon } from "../assets/icons/AuthIcons";
 import { formatCPF } from "../utils/formatters";
 
-// --- COMPONENTES AUXILIARES (Definidos antes para evitar ReferenceError) ---
+// --- CONSTANTES ---
+const DOMINIOS_INSTITUCIONAIS = ["@biblioteca.com", "@instituicao.edu"];
+
+// --- COMPONENTES AUXILIARES ---
 
 const EyeIcon = ({ open }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -24,7 +27,6 @@ const SocialButton = ({ onClick, icon, label }) => (
     onClick={onClick} 
     className="flex items-center justify-center gap-4 w-full py-4 px-6 rounded-2xl border border-white/5 bg-white/5 text-slate-300 text-sm font-bold transition-all hover:border-white/20 hover:bg-white/10 active:scale-[0.98]"
   >
-    {/* Este span é o "quadradinho" que garante que todos os ícones ocupem o mesmo espaço */}
     <span className="w-5 h-5 flex items-center justify-center shrink-0">
       {icon}
     </span>
@@ -42,35 +44,29 @@ const OAuthSection = ({ onOAuth }) => (
         Acesso Rápido
       </span>
     </div>
-    
     <div className="flex flex-col gap-3">
-      <SocialButton 
-        onClick={() => onOAuth("google")} 
-        icon={<GoogleIcon />} 
-        label="Entrar com Google" 
-      />
-      <SocialButton 
-        onClick={() => onOAuth("meta")} 
-        icon={<MetaIcon />} 
-        label="Entrar com Meta" 
-      />
-      <SocialButton 
-        onClick={() => onOAuth("apple")} 
-        icon={<AppleIcon />} 
-        label="Entrar com Apple" 
-      />
+      <SocialButton onClick={() => onOAuth("google")} icon={<GoogleIcon />} label="Entrar com Google" />
+      <SocialButton onClick={() => onOAuth("meta")} icon={<MetaIcon />} label="Entrar com Meta" />
+      <SocialButton onClick={() => onOAuth("apple")} icon={<AppleIcon />} label="Entrar com Apple" />
     </div>
   </div>
 );
 
-const SuccessFeedback = ({ onBack }) => (
-  <div className="text-center py-6 animate-in zoom-in duration-300">
-    <div className="w-20 h-20 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center text-3xl mx-auto mb-6 border border-green-500/20 shadow-[0_0_30px_rgba(34,197,94,0.2)]">
-      ✓
+const SuccessFeedback = ({ onBack, isAutoActive }) => (
+  <div className="flex flex-col items-center text-center py-8">
+    <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6 border border-green-500/30">
+      <span className="text-4xl text-green-500">✓</span>
     </div>
-    <h3 className="text-2xl font-bold text-white mb-2">Sucesso!</h3>
-    <p className="text-slate-400 text-sm mb-8">Seu cadastro foi enviado para análise do bibliotecário.</p>
-    <button type="button" onClick={onBack} className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl transition-all">
+    <h2 className="text-2xl font-bold text-white mb-2">Sucesso!</h2>
+    <p className="text-slate-400 mb-8 max-w-xs">
+      {isAutoActive 
+        ? "Sua conta está ativa. Você já pode realizar o login." 
+        : "Seu cadastro foi enviado para análise do bibliotecário."}
+    </p>
+    <button
+      onClick={onBack}
+      className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold transition-all"
+    >
       Entrar na conta
     </button>
   </div>
@@ -81,10 +77,6 @@ const SuccessFeedback = ({ onBack }) => (
 export default function Login() {
   const [mode, setMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
-  
-  // Pegando as funções do useAuth
-  const { login, register, handleOAuth, loading, error, success } = useAuth();
-
   const [formData, setFormData] = useState({
     email: "", 
     password: "", 
@@ -92,6 +84,11 @@ export default function Login() {
     cpf: "", 
     papel: "cliente"
   });
+
+  // Persistência da decisão de ativação para a tela de sucesso
+  const [wasAutoActivated, setWasAutoActivated] = useState(false);
+
+  const { login, register, handleOAuth, loading, error, success, setSuccess } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -104,8 +101,23 @@ export default function Login() {
     if (mode === "login") {
       login(formData.email, formData.password);
     } else {
+      // 1. Cálculo da regra de ativação ANTES de disparar o registro
+      const eInstitucional = DOMINIOS_INSTITUCIONAIS.some(dom => 
+        formData.email.toLowerCase().endsWith(dom)
+      );
+      const isAuto = formData.papel === 'bibliotecario' && eInstitucional;
+      
+      // 2. Armazena no estado local persistente
+      setWasAutoActivated(isAuto);
+      
+      // 3. Dispara o registro
       register(formData);
     }
+  };
+
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    if (setSuccess) setSuccess(false); // Reseta estado de sucesso do Hook
   };
 
   return (
@@ -125,21 +137,27 @@ export default function Login() {
         </header>
 
         {success ? (
-          <SuccessFeedback onBack={() => setMode("login")} />
+          <SuccessFeedback 
+            onBack={() => {
+              setMode("login");
+              if (setSuccess) setSuccess(false);
+            }} 
+            isAutoActive={wasAutoActivated} 
+          />
         ) : (
           <>
             <nav className="flex bg-black/40 rounded-2xl p-1.5 mb-8 border border-white/5">
               <button 
                 type="button"
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${mode === 'login' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300'}`}
-                onClick={() => setMode("login")}
+                onClick={() => handleModeChange("login")}
               >
                 Entrar
               </button>
               <button 
                 type="button"
                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${mode === 'cadastro' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300'}`}
-                onClick={() => setMode("cadastro")}
+                onClick={() => handleModeChange("cadastro")}
               >
                 Cadastrar
               </button>
@@ -148,22 +166,8 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === "cadastro" && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
-                  <input 
-                    name="nome" 
-                    className="input-field" 
-                    placeholder="Nome completo" 
-                    onChange={handleChange} 
-                    value={formData.nome}
-                    required 
-                  />
-                  <input 
-                    name="cpf" 
-                    className="input-field" 
-                    placeholder="CPF (opcional)" 
-                    onChange={handleChange} 
-                    value={formData.cpf}
-                    maxLength={14} 
-                  />
+                  <input name="nome" className="input-field" placeholder="Nome completo" onChange={handleChange} value={formData.nome} required />
+                  <input name="cpf" className="input-field" placeholder="CPF (opcional)" onChange={handleChange} value={formData.cpf} maxLength={14} />
                   <div className="flex gap-3 p-1 bg-black/20 rounded-2xl border border-white/5">
                     {["cliente", "bibliotecario"].map((p) => (
                       <button key={p} type="button" 
@@ -177,26 +181,10 @@ export default function Login() {
                 </div>
               )}
 
-              <input 
-                name="email" 
-                type="email" 
-                className="input-field" 
-                placeholder="E-mail" 
-                onChange={handleChange} 
-                value={formData.email}
-                required 
-              />
+              <input name="email" type="email" className="input-field" placeholder="E-mail" onChange={handleChange} value={formData.email} required />
               
               <div className="relative group">
-                <input 
-                  name="password" 
-                  type={showPassword ? "text" : "password"} 
-                  className="input-field pr-12" 
-                  placeholder="Senha" 
-                  onChange={handleChange} 
-                  value={formData.password}
-                  required 
-                />
+                <input name="password" type={showPassword ? "text" : "password"} className="input-field pr-12" placeholder="Senha" onChange={handleChange} value={formData.password} required />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-500 transition-colors">
                   <EyeIcon open={showPassword} />
                 </button>

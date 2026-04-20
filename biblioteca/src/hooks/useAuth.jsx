@@ -2,7 +2,7 @@ import { createContext, useState, useContext, useEffect } from "react";
 import { login as loginService, register as registerService } from "../services/authService";
 import { supabase } from "../services/supabaseClient";
 
-// 1. Criamos o contexto (deixamos null para a trava de segurança abaixo)
+// 1. Criação do contexto
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
-  // Monitora a sessão do usuário
+  // Monitoramento da sessão do usuário no Supabase
   useEffect(() => {
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -32,8 +32,10 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setLoading(true);
     setError(null);
+    setSuccess(false); // Reseta estado de sucesso anterior
     try {
-      await loginService(email, password);
+      const data = await loginService(email, password);
+      setUser(data.user);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -44,17 +46,20 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     setLoading(true);
     setError(null);
+    setSuccess(false); // Garante que a tela de sucesso só apareça se esta tentativa der certo
     try {
       await registerService(userData);
-      setSuccess(true); // Ativa a tela de sucesso no Login.jsx
+      setSuccess(true); 
     } catch (err) {
       setError(err.message);
+      setSuccess(false);
     } finally {
       setLoading(false);
     }
   };
 
   const handleOAuth = async (provider) => {
+    setError(null);
     try {
       const { error } = await supabase.auth.signInWithOAuth({ provider });
       if (error) throw error;
@@ -63,28 +68,29 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Objeto de valor centralizado para evitar problemas de renderização
+  const value = {
+    user,
+    loading,
+    error,
+    success,
+    setSuccess,
+    login,
+    register,
+    handleOAuth
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      register, 
-      handleOAuth, 
-      loading, 
-      error, 
-      success,
-      setSuccess // Adicionei para você poder resetar o estado de sucesso se precisar
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// 2. Hook com trava de segurança
+// 2. Hook Customizado com trava de segurança
 export const useAuth = () => {
   const context = useContext(AuthContext);
   
-  // Se o contexto for null, significa que o componente que chamou useAuth
-  // está fora do <AuthProvider> no App.jsx
   if (!context) {
     throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
