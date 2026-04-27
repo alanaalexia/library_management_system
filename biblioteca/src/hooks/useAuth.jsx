@@ -1,6 +1,12 @@
 import { createContext, useState, useContext, useEffect } from "react";
-import { login as loginService, register as registerService } from "../services/authService";
 import { supabase } from "../services/supabaseClient";
+// Centralizamos todos os imports do authService em uma única linha:
+import { 
+  login as loginService, 
+  register as registerService, 
+  syncOrCreateUser, 
+  signInWithGoogle 
+} from "../services/authService";
 
 // 1. Criação do contexto
 const AuthContext = createContext(null);
@@ -13,17 +19,30 @@ export function AuthProvider({ children }) {
 
   // Monitoramento da sessão do usuário no Supabase
   useEffect(() => {
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+    const handleSession = async (session) => {
+      if (session?.user) {
+        try {
+          // Aqui chamamos a sua função de sincronização que está no authService
+          await syncOrCreateUser(session.user);
+          setUser(session.user);
+        } catch (err) {
+          console.error("Erro ao sincronizar perfil:", err.message);
+          setError("Falha ao configurar seu perfil de acesso.");
+        }
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     };
 
-    getInitialSession();
+    // 1. Checa a sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
+    });
 
+    // 2. Ouve mudanças (O login do Google dispara isso aqui quando volta para o site)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
+      handleSession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -58,13 +77,25 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // --- HANDLE OAUTH ATUALIZADO ---
   const handleOAuth = async (provider) => {
     setError(null);
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider });
-      if (error) throw error;
+      if (provider === 'google') {
+        // Usa a função que você já criou no authService
+        await signInWithGoogle();
+      } else {
+        // Caso queira adicionar Meta/Apple no futuro
+        const { error } = await supabase.auth.signInWithOAuth({ 
+          provider,
+          options: { redirectTo: window.location.origin }
+        });
+        if (error) throw error;
+      }
     } catch (err) {
       setError(err.message);
+      setLoading(false); // Só desliga o loading se der erro, pois se der certo ele redireciona
     }
   };
 
