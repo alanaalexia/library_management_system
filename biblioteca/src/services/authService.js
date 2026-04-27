@@ -69,3 +69,16 @@ export const logout = async () => {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 };
+
+// Função de login social para entrar com google
+export const signInWithGoogle = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      // Garante que o usuário volte para a página inicial ou dashboard após logar
+      redirectTo: window.location.origin, 
+    },
+  });
+  if (error) throw error;
+  return data;
+};
