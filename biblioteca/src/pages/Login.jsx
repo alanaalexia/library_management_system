@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { GoogleIcon, MetaIcon, AppleIcon } from "../assets/icons/AuthIcons";
+import { GoogleIcon } from "../assets/icons/AuthIcons";
 import { formatCPF } from "../utils/formatters";
 
 // --- CONSTANTES ---
@@ -46,8 +46,6 @@ const OAuthSection = ({ onOAuth }) => (
     </div>
     <div className="flex flex-col gap-3">
       <SocialButton onClick={() => onOAuth("google")} icon={<GoogleIcon />} label="Entrar com Google" />
-      <SocialButton onClick={() => onOAuth("meta")} icon={<MetaIcon />} label="Entrar com Meta" />
-      <SocialButton onClick={() => onOAuth("apple")} icon={<AppleIcon />} label="Entrar com Apple" />
     </div>
   </div>
 );
