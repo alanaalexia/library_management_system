@@ -24,7 +24,19 @@ export function AuthProvider({ children }) {
         try {
           // Aqui chamamos a sua função de sincronização que está no authService
           await syncOrCreateUser(session.user);
-          setUser(session.user);
+
+          // BUSCA OS DADOS EXTRAS (papel, nome) na tabela pessoa
+          const { data: profile, error: profileError } = await supabase
+            .from('pessoa') // Nome da tabela no banco
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError) throw profileError;
+
+          // Define o usuário com TUDO (dados de auth + dados da tabela pessoa)
+          setUser({ ...session.user, ...profile });
+
         } catch (err) {
           console.error("Erro ao sincronizar perfil:", err.message);
           setError("Falha ao configurar seu perfil de acesso.");
