@@ -1,6 +1,5 @@
 import { createContext, useState, useContext, useEffect } from "react";
 import { supabase } from "../services/supabaseClient";
-// Centralizamos todos os imports do authService em uma única linha:
 import { 
   login as loginService, 
   register as registerService, 
@@ -8,7 +7,6 @@ import {
   signInWithGoogle 
 } from "../services/authService";
 
-// 1. Criação do contexto
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -17,44 +15,49 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
-  // Monitoramento da sessão do usuário no Supabase
   useEffect(() => {
-    const handleSession = async (session) => {
+    // 1. Função para buscar os dados do banco
+    const getProfile = async (sessionUser) => {
+      try {
+        // Sincroniza (garante que existe no banco)
+        await syncOrCreateUser(sessionUser);
+
+        // Busca dados extras
+        const { data, error } = await supabase
+          .from('pessoa')
+          .select('*')
+          .eq('id_pessoa', sessionUser.id)
+          .single();
+
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        console.error("Erro ao carregar perfil:", err.message);
+        return null;
+      }
+    };
+
+    // 2. Ouvinte de mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // IMPORTANTE: Só buscamos o perfil se o evento não for "SIGNED_OUT"
       if (session?.user) {
-        try {
-          // Aqui chamamos a sua função de sincronização que está no authService
-          await syncOrCreateUser(session.user);
-
-          // BUSCA OS DADOS EXTRAS (papel, nome) na tabela pessoa
-          const { data: profile, error: profileError } = await supabase
-            .from('pessoa') // Nome da tabela no banco
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError) throw profileError;
-
-          // Define o usuário com TUDO (dados de auth + dados da tabela pessoa)
-          setUser({ ...session.user, ...profile });
-
-        } catch (err) {
-          console.error("Erro ao sincronizar perfil:", err.message);
-          setError("Falha ao configurar seu perfil de acesso.");
-        }
+        const profile = await getProfile(session.user);
+        setUser({ ...session.user, ...profile });
       } else {
         setUser(null);
       }
       setLoading(false);
-    };
-
-    // 1. Checa a sessão inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      handleSession(session);
     });
 
-    // 2. Ouve mudanças (O login do Google dispara isso aqui quando volta para o site)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      handleSession(session);
+    // 3. Verificação inicial (rodar uma vez ao abrir a página)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const profile = await getProfile(session.user);
+        setUser({ ...session.user, ...profile });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -63,13 +66,13 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setLoading(true);
     setError(null);
-    setSuccess(false); // Reseta estado de sucesso anterior
+    setSuccess(false);
     try {
       const data = await loginService(email, password);
-      setUser(data.user);
+      // O handleSession acima será disparado pelo onAuthStateChange, 
+      // então não precisamos setar o user aqui manualmente para evitar conflito.
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -77,41 +80,30 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     setLoading(true);
     setError(null);
-    setSuccess(false); // Garante que a tela de sucesso só apareça se esta tentativa der certo
+    setSuccess(false);
     try {
       await registerService(userData);
       setSuccess(true); 
     } catch (err) {
       setError(err.message);
-      setSuccess(false);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- HANDLE OAUTH ATUALIZADO ---
   const handleOAuth = async (provider) => {
     setError(null);
     setLoading(true);
     try {
       if (provider === 'google') {
-        // Usa a função que você já criou no authService
         await signInWithGoogle();
-      } else {
-        // Caso queira adicionar Meta/Apple no futuro
-        const { error } = await supabase.auth.signInWithOAuth({ 
-          provider,
-          options: { redirectTo: window.location.origin }
-        });
-        if (error) throw error;
       }
     } catch (err) {
       setError(err.message);
-      setLoading(false); // Só desliga o loading se der erro, pois se der certo ele redireciona
+      setLoading(false);
     }
   };
 
-  // Objeto de valor centralizado para evitar problemas de renderização
   const value = {
     user,
     loading,
@@ -130,13 +122,10 @@ export function AuthProvider({ children }) {
   );
 }
 
-// 2. Hook Customizado com trava de segurança
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
   if (!context) {
     throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
-  
   return context;
 };

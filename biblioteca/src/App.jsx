@@ -9,18 +9,22 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 export default function App() {
   const { user, loading } = useAuth();
 
-  if (loading) return <div className="h-screen flex items-center justify-center">Carregando...</div>;
+  // 1. Se estiver carregando, mostra o loading
+  if (loading) {
+    return <div className="h-screen flex items-center justify-center">Carregando...</div>;
+  }
 
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+        {/* Se NÃO tem user, Login. Se TEM user, Dashboard */}
+        <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" replace />} />
 
         <Route 
           path="/dashboard" 
           element={
             <ProtectedRoute user={user}>
-              {/* se for bibliotecario, mostra uma, se não, outra */}
+              {/* Verificação extra: só renderiza se o papel já existir no objeto user */}
               {user?.papel === "bibliotecario" ? (
                 <LibrarianHome userProfile={user} />
               ) : (
@@ -30,7 +34,9 @@ export default function App() {
           } 
         />
 
-        <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
+        {/* Rota padrão */}
+        <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
+        <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
       </Routes>
     </Router>
   );
