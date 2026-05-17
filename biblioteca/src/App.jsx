@@ -6,7 +6,7 @@ import StudentHome from "./pages/Student/StudentHome.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, success } = useAuth();
 
   if (loading) {
     return (
@@ -21,21 +21,26 @@ export default function App() {
       <Routes>
         <Route
           path="/login"
-          element={!user ? <Login /> : <Navigate to="/dashboard" replace />}
+          element={
+            // Se tem user ativo com papel definido, vai para dashboard.
+            // Se tem user mas está pendente ou sem papel, fica no login
+            // (o Login.jsx mostrará o feedback de aprovação via success).
+            user && user.papel && user.status === 'ativo'
+              ? <Navigate to="/dashboard" replace />
+              : <Login />
+          }
         />
 
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute user={user}>
-              {/* Aguarda o papel estar disponível no perfil antes de renderizar.
-                  Sem isso, um bibliotecário recém-logado pode ver StudentHome
-                  por um instante enquanto o perfil ainda não chegou. */}
+            <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
+              {/* Guard: aguarda papel estar disponível no perfil */}
               {!user?.papel ? (
                 <div className="h-screen flex items-center justify-center bg-black">
                   <span className="text-white text-lg">Carregando perfil...</span>
                 </div>
-              ) : user.papel === "bibliotecario" ? (
+              ) : user.papel === 'bibliotecario' ? (
                 <LibrarianHome userProfile={user} />
               ) : (
                 <StudentHome userProfile={user} />
@@ -46,11 +51,21 @@ export default function App() {
 
         <Route
           path="/"
-          element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
+          element={
+            <Navigate
+              to={user && user.papel && user.status === 'ativo' ? '/dashboard' : '/login'}
+              replace
+            />
+          }
         />
         <Route
           path="*"
-          element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
+          element={
+            <Navigate
+              to={user && user.papel && user.status === 'ativo' ? '/dashboard' : '/login'}
+              replace
+            />
+          }
         />
       </Routes>
     </Router>
