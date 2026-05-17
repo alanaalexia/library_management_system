@@ -119,7 +119,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black font-sans p-6">
+
+
+
+    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black font-sans p-6"
+      style={{
+        backgroundImage: `url('/bookshelf-bg.jpg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       <div className="w-full max-w-[420px] bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-white/10 p-10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
         
         <header className="text-center mb-8">
