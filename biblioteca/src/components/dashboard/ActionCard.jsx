@@ -1,9 +1,16 @@
-export const ActionCard = ({ title, icon, onClick }) => (
-  <button 
+/**
+ * ActionCard — botão de ação principal das páginas Home.
+ * Reutilizado em StudentHome e LibrarianHome.
+ *
+ * Props:
+ *  - title (string): texto do botão
+ *  - onClick (fn): ação de navegação
+ */
+export const ActionCard = ({ title, onClick }) => (
+  <button
     onClick={onClick}
-    className="flex flex-col items-center justify-center p-8 bg-[#E3F2FD] rounded-2xl border-2 border-[#BBDEFB] hover:bg-[#BBDEFB] transition-colors w-48 h-48 shadow-sm"
+    className="px-10 py-3 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-md transition-colors duration-150 text-base shadow-md w-48"
   >
-    <div className="text-4xl mb-4">{icon}</div>
-    <span className="font-bold text-[#1976D2] text-lg">{title}</span>
+    {title}
   </button>
 );
