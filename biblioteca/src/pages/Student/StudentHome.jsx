@@ -1,5 +1,6 @@
 import { ActionCard } from '../../components/dashboard/ActionCard';
 import { AlertItem } from '../../components/dashboard/AlertItem';
+import { TopBar } from '../../components/dashboard/TopBar';
 
 /**
  * TODO: substituir `overdueBooks` e `alerts` por dados reais da API.
@@ -29,17 +30,12 @@ const StudentHome = ({ userProfile }) => {
         backgroundPosition: 'center',
       }}
     >
-      {/* Dark overlay */}
       <div className="absolute inset-0 bg-black/60" />
 
-      {/* Top-right icons */}
-      <div className="absolute top-4 right-4 flex gap-2 z-10">
-        <button className="text-white/80 hover:text-white text-xl">👥</button>
-        <button className="text-white/80 hover:text-white text-xl">👤</button>
-      </div>
+      {/* Sem sino — apenas logout */}
+      <TopBar />
 
       <div className="relative z-10 flex flex-col items-center gap-6 text-center px-4">
-        {/* Welcome */}
         <div>
           <p className="text-white text-xl font-normal">
             Seja bem vindo(a) ao Bibliotheca+,
@@ -49,13 +45,11 @@ const StudentHome = ({ userProfile }) => {
           </p>
         </div>
 
-        {/* Actions */}
         <div className="flex flex-col gap-3 items-center">
           <ActionCard title="Acervo" onClick={() => console.log('Ir para Acervo')} />
           <ActionCard title="Empréstimos" onClick={() => console.log('Ir para Empréstimos')} />
         </div>
 
-        {/* Alerts */}
         <div className="bg-black/50 border border-white/10 rounded-md px-6 py-4 text-left min-w-[260px]">
           <div className="flex items-center gap-2 py-1 text-sm mb-1">
             <span className="font-semibold text-red-400">{overdueBooks}</span>

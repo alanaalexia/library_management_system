@@ -3,6 +3,7 @@ import { supabase } from "../services/supabaseClient";
 import { 
   login as loginService, 
   register as registerService, 
+  logout as logoutService,
   syncOrCreateUser, 
   signInWithGoogle 
 } from "../services/authService";
@@ -16,19 +17,14 @@ export function AuthProvider({ children }) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // 1. Função para buscar os dados do banco
     const getProfile = async (sessionUser) => {
       try {
-        // Sincroniza (garante que existe no banco)
         await syncOrCreateUser(sessionUser);
-
-        // Busca dados extras
         const { data, error } = await supabase
           .from('pessoa')
           .select('*')
           .eq('id_pessoa', sessionUser.id)
           .single();
-
         if (error) throw error;
         return data;
       } catch (err) {
@@ -37,9 +33,7 @@ export function AuthProvider({ children }) {
       }
     };
 
-    // 2. Ouvinte de mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // IMPORTANTE: Só buscamos o perfil se o evento não for "SIGNED_OUT"
       if (session?.user) {
         const profile = await getProfile(session.user);
         setUser({ ...session.user, ...profile });
@@ -49,7 +43,6 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    // 3. Verificação inicial (rodar uma vez ao abrir a página)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const profile = await getProfile(session.user);
@@ -68,9 +61,8 @@ export function AuthProvider({ children }) {
     setError(null);
     setSuccess(false);
     try {
-      const data = await loginService(email, password);
-      // O handleSession acima será disparado pelo onAuthStateChange, 
-      // então não precisamos setar o user aqui manualmente para evitar conflito.
+      await loginService(email, password);
+      // onAuthStateChange cuida de setar o user automaticamente
     } catch (err) {
       setError(err.message);
       setLoading(false);
@@ -83,7 +75,7 @@ export function AuthProvider({ children }) {
     setSuccess(false);
     try {
       await registerService(userData);
-      setSuccess(true); 
+      setSuccess(true);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -95,12 +87,20 @@ export function AuthProvider({ children }) {
     setError(null);
     setLoading(true);
     try {
-      if (provider === 'google') {
-        await signInWithGoogle();
-      }
+      if (provider === 'google') await signInWithGoogle();
     } catch (err) {
       setError(err.message);
       setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    setError(null);
+    try {
+      await logoutService();
+      // onAuthStateChange cuida de setar user para null automaticamente
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -112,7 +112,8 @@ export function AuthProvider({ children }) {
     setSuccess,
     login,
     register,
-    handleOAuth
+    handleOAuth,
+    logout,
   };
 
   return (
