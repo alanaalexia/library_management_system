@@ -3,8 +3,7 @@ import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login.jsx";
 import LibrarianHome from "./pages/Librarian/LibrarianHome.jsx";
 import StudentHome from "./pages/Student/StudentHome.jsx";
-import Acervo from "./pages/Acervo";
-import Dashboard from "./pages/Dashboard";
+import LibrarianBooks from "./pages/Librarian/LibrarianBooks.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
@@ -21,23 +20,24 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        {/* Rota de Login com Redirecionamento Automático para Usuários Ativos */}
         <Route
           path="/login"
-          element={
-		        // Se tem user ativo com papel definido, vai para dashboard.
+            // Se tem user ativo com papel definido, vai para dashboard.
             // Se tem user mas está pendente ou sem papel, fica no login
             // (o Login.jsx mostrará o feedback de aprovação via success).
+          element={
             user && user.papel && user.status === 'ativo'
               ? <Navigate to="/dashboard" replace />
               : <Login />
           }
         />
 
+        {/* Dashboard com Controle de Papéis (Bibliotecário ou Estudante) */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
-		          {/* Guard: aguarda papel estar disponível no perfil */}
               {!user?.papel ? (
                 <div className="h-screen flex items-center justify-center bg-black">
                   <span className="text-white text-lg">Carregando perfil...</span>
@@ -51,16 +51,17 @@ export default function App() {
           }
         />
 
-        {/* Rota do Acervo — protegida da mesma forma */}
+        {/* Nova Rota do Acervo Integrada ao LibrarianBooks */}
         <Route
           path="/acervo"
           element={
             <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
-              <Acervo />
+              <LibrarianBooks />
             </ProtectedRoute>
           }
         />
 
+        {/* Rotas de Fallback e Redirecionamento Padrão */}
         <Route
           path="/"
           element={
