@@ -1,25 +1,55 @@
+import { useEffect, useState } from 'react';
 import { ActionCard } from '../../components/dashboard/ActionCard';
 import { AlertItem } from '../../components/dashboard/AlertItem';
 import { TopBar } from '../../components/dashboard/TopBar';
-
-/**
- * TODO: substituir `overdueBooks` e `alerts` por dados reais da API.
- * Estrutura esperada futuramente:
- *
- * overdueBooks: number        — total de livros em atraso do aluno
- * alerts: Array<{
- *   bookTitle: string,
- *   daysLeft: number          — negativo = atrasado
- * }>
- */
-const MOCK_OVERDUE_BOOKS = 1;
-const MOCK_ALERTS = [
-  { bookTitle: 'Bíblia', daysLeft: -1 },
-];
+import { getDadosAlunoHome } from '../../services/emprestimoService';
+import { supabase } from '../../services/supabaseClient';
 
 const StudentHome = ({ userProfile }) => {
-  const overdueBooks = MOCK_OVERDUE_BOOKS;
-  const alerts = MOCK_ALERTS;
+  const [overdueBooks, setOverdueBooks] = useState(0);
+  const [alerts, setAlerts] = useState([]);
+  const [booksInPossession, setBooksInPossession] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const carregarDados = async () => {
+      try {
+        setLoading(true);
+
+        // Obter ID do cliente (aluno) através do ID da pessoa autenticada
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          console.error('Usuário não autenticado');
+          return;
+        }
+
+        const { data: cliente } = await supabase
+          .from('cliente')
+          .select('id_cliente')
+          .eq('id_pessoa', user.id)
+          .single();
+
+        if (!cliente) {
+          console.error('Cliente não encontrado');
+          return;
+        }
+
+        const dados = await getDadosAlunoHome(cliente.id_cliente);
+        setOverdueBooks(dados.overdueBooks);
+        setAlerts(dados.alerts);
+        setBooksInPossession(dados.booksInPossession);
+      } catch (error) {
+        console.error('Erro ao carregar dados do aluno:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, []);
 
   return (
     <div
@@ -52,16 +82,29 @@ const StudentHome = ({ userProfile }) => {
 
         <div className="bg-black/50 border border-white/10 rounded-md px-6 py-4 text-left min-w-[260px]">
           <div className="flex items-center gap-2 py-1 text-sm mb-1">
-            <span className="font-semibold text-red-400">{overdueBooks}</span>
+            <span className="font-semibold text-red-400">
+              {loading ? '—' : overdueBooks}
+            </span>
             <span className="text-white/90">Livro(s) em atraso.</span>
           </div>
-          {alerts.map((alert, index) => (
-            <AlertItem
-              key={index}
-              daysLeft={alert.daysLeft}
-              bookTitle={alert.bookTitle}
-            />
-          ))}
+          <div className="flex items-center gap-2 py-1 text-sm mb-2">
+            <span className="font-semibold text-blue-400">
+              {loading ? '—' : booksInPossession}
+            </span>
+            <span className="text-white/90">Livro(s) em posse.</span>
+          </div>
+          {alerts.length === 0 && !loading ? (
+            <p className="text-white/70 text-sm py-2">Nenhum aviso de devolução.</p>
+          ) : (
+            alerts.map((alert, index) => (
+              <AlertItem
+                key={index}
+                daysLeft={alert.daysLeft}
+                bookTitle={alert.bookTitle}
+                loading={loading}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>

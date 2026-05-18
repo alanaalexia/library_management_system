@@ -1,31 +1,39 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionCard } from '../../components/dashboard/ActionCard';
 import { StatItem } from '../../components/dashboard/StatItem';
 import { TopBar } from '../../components/dashboard/TopBar';
-
-/**
- * TODO: substituir `stats` e `notificationCount` por dados reais da API.
- * Estrutura esperada futuramente:
- *
- * stats: {
- *   pendingConfirmation: number,   — alunos aguardando aprovação de cadastro
- *   overdue: number,               — alunos com livros em atraso
- *   suspended: number,             — alunos suspensos
- * }
- * notificationCount: number        — notificações não visualizadas
- */
-const MOCK_STATS = {
-  pendingConfirmation: 0,
-  overdue: 0,
-  suspended: 0,
-};
-
-const MOCK_NOTIFICATION_COUNT = 0;
+import { getDadosBibliotecarioHome } from '../../services/bibliotecarioService';
 
 const LibrarianHome = ({ userProfile }) => {
-  const stats = MOCK_STATS;
-  const notificationCount = MOCK_NOTIFICATION_COUNT;
+  const [stats, setStats] = useState({
+    pendingConfirmation: 0,
+    overdue: 0,
+    suspended: 0,
+  });
+  const [notificationCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const carregarDados = async () => {
+      try {
+        setLoading(true);
+        const dados = await getDadosBibliotecarioHome();
+        setStats({
+          pendingConfirmation: dados.pendingConfirmation,
+          overdue: dados.overdue,
+          suspended: dados.suspended,
+        });
+      } catch (error) {
+        console.error('Erro ao carregar dados do bibliotecário:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, []);
 
   return (
     <div
@@ -59,9 +67,21 @@ const LibrarianHome = ({ userProfile }) => {
 
         {/* Painel de Estatísticas Modulares */}
         <div className="bg-black/50 border border-white/10 rounded-md px-6 py-4 text-left min-w-[260px]">
-          <StatItem count={stats.pendingConfirmation} label="Estudantes a serem confirmados." />
-          <StatItem count={stats.overdue} label="Estudantes em atraso." />
-          <StatItem count={stats.suspended} label="Estudantes suspensos." />
+          <StatItem
+            count={stats.pendingConfirmation}
+            label="Estudantes a serem confirmados."
+            loading={loading}
+          />
+          <StatItem
+            count={stats.overdue}
+            label="Estudantes em atraso."
+            loading={loading}
+          />
+          <StatItem
+            count={stats.suspended}
+            label="Estudantes suspensos."
+            loading={loading}
+          />
         </div>
       </div>
     </div>
