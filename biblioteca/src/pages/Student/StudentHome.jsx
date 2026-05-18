@@ -30,7 +30,7 @@ const StudentHome = ({ userProfile }) => {
           .from('cliente')
           .select('id_cliente')
           .eq('id_pessoa', user.id)
-          .single();
+          .maybeSingle();
 
         if (!cliente) {
           console.error('Cliente não encontrado');
