@@ -3,6 +3,8 @@ import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login.jsx";
 import LibrarianHome from "./pages/Librarian/LibrarianHome.jsx";
 import StudentHome from "./pages/Student/StudentHome.jsx";
+import Acervo from "./pages/Acervo";
+import Dashboard from "./pages/Dashboard";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
@@ -22,7 +24,7 @@ export default function App() {
         <Route
           path="/login"
           element={
-            // Se tem user ativo com papel definido, vai para dashboard.
+		        // Se tem user ativo com papel definido, vai para dashboard.
             // Se tem user mas está pendente ou sem papel, fica no login
             // (o Login.jsx mostrará o feedback de aprovação via success).
             user && user.papel && user.status === 'ativo'
@@ -35,7 +37,7 @@ export default function App() {
           path="/dashboard"
           element={
             <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
-              {/* Guard: aguarda papel estar disponível no perfil */}
+		          {/* Guard: aguarda papel estar disponível no perfil */}
               {!user?.papel ? (
                 <div className="h-screen flex items-center justify-center bg-black">
                   <span className="text-white text-lg">Carregando perfil...</span>
@@ -45,6 +47,16 @@ export default function App() {
               ) : (
                 <StudentHome userProfile={user} />
               )}
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Rota do Acervo — protegida da mesma forma */}
+        <Route
+          path="/acervo"
+          element={
+            <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
+              <Acervo />
             </ProtectedRoute>
           }
         />
