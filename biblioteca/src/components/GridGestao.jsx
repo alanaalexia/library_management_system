@@ -8,23 +8,39 @@ export default function GridGestao({
   selectedRowIndex, 
   onRowSelect 
 }) {
+  // Filtra as linhas para remover a última se ela estiver vazia E o grid for apenas leitura
+  const visibleData = data.filter((row, rowIndex) => {
+    const isLastRow = rowIndex === data.length - 1;
+    const isRowEmpty = columns.every(col => !row[col] || row[col].toString().trim() === "");
+    
+    if (isReadOnly && isLastRow && isRowEmpty) {
+      return false; // Oculta a linha no modo de leitura
+    }
+    return true;
+  });
+
   return (
     <div className="flex-1 overflow-y-auto border border-white/10 rounded-lg bg-slate-900/30 shadow-inner">
       <table className="w-full border-separate border-spacing-0">
         <thead className="sticky top-0 z-20 bg-blue-700">
-          <tr className="text-xs text-left uppercase tracking-wider">
+          <tr className="text-xs text-center uppercase tracking-wider font-sans">
             {/* Coluna sem título para seleção */}
-            <th className="p-3 border-r border-blue-800 text-white font-bold w-12 text-center"></th>
+            <th className="p-3 border-r border-blue-800 text-white font-semibold w-12 text-center"></th>
             {columns.map((col) => (
-              <th key={col} className="p-3 border-r border-blue-800 text-white font-bold">
+              <th key={col} className="p-3 border-r border-blue-800 text-white font-semibold text-center">
                 {col}
               </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {data.map((row, rowIndex) => {
+          {visibleData.map((row, rowIndex) => {
             const isSelected = selectedRowIndex === rowIndex;
+            // A verificação do ícone agora é baseada no array original 'data' para manter a correspondência com o estado
+            const isLastRowInOriginal = rowIndex === data.length - 1;
+            const isRowEmpty = columns.every(col => !row[col] || row[col].toString().trim() === "");
+            const showIcon = !(isLastRowInOriginal && isRowEmpty && !isSelected);
+
             return (
               <tr 
                 key={rowIndex} 
@@ -37,7 +53,7 @@ export default function GridGestao({
                   }
                 }}
               >
-                {/* Célula com o ícone de 3 linhas paralelas horizontais */}
+                {/* Célula com o ícone condicional de 3 linhas paralelas horizontais */}
                 <td 
                   className="p-0 border-r border-white/5 text-center align-middle"
                   onClick={(e) => {
@@ -47,11 +63,13 @@ export default function GridGestao({
                     if (onRowSelect) onRowSelect(rowIndex);
                   }}
                 >
-                  <div className="flex flex-col gap-0.5 justify-center items-center h-full w-full py-2">
-                    <span className="w-4 h-0.5 bg-slate-400 block"></span>
-                    <span className="w-4 h-0.5 bg-slate-400 block"></span>
-                    <span className="w-4 h-0.5 bg-slate-400 block"></span>
-                  </div>
+                  {showIcon && (
+                    <div className="flex flex-col gap-0.5 justify-center items-center h-full w-full py-2">
+                      <span className="w-4 h-0.5 bg-slate-400 block"></span>
+                      <span className="w-4 h-0.5 bg-slate-400 block"></span>
+                      <span className="w-4 h-0.5 bg-slate-400 block"></span>
+                    </div>
+                  )}
                 </td>
                 
                 {columns.map((col) => (
