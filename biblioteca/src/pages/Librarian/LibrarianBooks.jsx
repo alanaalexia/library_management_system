@@ -95,13 +95,29 @@ export default function LibrarianBooks() {
       }
 
       if (linhasParaValidar.length > 0) {
-        const { error } = await supabase
-          .from("livro")
-          .upsert(linhasParaValidar, { onConflict: "isbn" });
-        if (error) throw error;
+        const linhasExistentes = linhasParaValidar.filter(({ id_livro }) =>
+          id_livro && String(id_livro).trim() !== ""
+        );
+        const linhasNovas = linhasParaValidar
+          .filter(({ id_livro }) => !id_livro || String(id_livro).trim() === "")
+          .map(({ id_livro, cadastrado_em, atualizado_em, ...resto }) => resto); // remove campos gerados pelo banco
+
+        if (linhasExistentes.length > 0) {
+          const { error } = await supabase
+            .from("livro")
+            .upsert(linhasExistentes, { onConflict: "isbn" });
+          if (error) throw error;
+        }
+
+        if (linhasNovas.length > 0) {
+          const { error } = await supabase
+            .from("livro")
+            .insert(linhasNovas);
+          if (error) throw error;
+        }
       }
 
-      setSucessoMsg("Acervo updated com sucesso!");
+      setSucessoMsg("Acervo atualizado com sucesso!");
       setIsbnDeletados([]);
       setSelectedRowIndex(null);
       setModoEdicao(false);
