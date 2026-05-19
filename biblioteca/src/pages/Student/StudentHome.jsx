@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ActionCard } from '../../components/dashboard/ActionCard';
 import { AlertItem } from '../../components/dashboard/AlertItem';
-import { TopBar } from '../../components/dashboard/TopBar';
+import StudentHeader from './StudentHeader';
 import { getDadosAlunoHome } from '../../services/emprestimoService';
 import { supabase } from '../../services/supabaseClient';
 
 const StudentHome = ({ userProfile }) => {
+  const navigate = useNavigate();
   const [overdueBooks, setOverdueBooks] = useState(0);
   const [alerts, setAlerts] = useState([]);
   const [booksInPossession, setBooksInPossession] = useState(0);
@@ -16,7 +18,6 @@ const StudentHome = ({ userProfile }) => {
       try {
         setLoading(true);
 
-        // Obter ID do cliente (aluno) através do ID da pessoa autenticada
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -53,7 +54,7 @@ const StudentHome = ({ userProfile }) => {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center relative"
+      className="min-h-screen flex flex-col relative w-full"
       style={{
         backgroundImage: `url('/bookshelf-bg.jpg')`,
         backgroundSize: 'cover',
@@ -62,10 +63,10 @@ const StudentHome = ({ userProfile }) => {
     >
       <div className="absolute inset-0 bg-black/60" />
 
-      {/* Sem sino — apenas logout */}
-      <TopBar />
+      {/* Cabeçalho do estudante parametrizado com navegação e logout */}
+      <StudentHeader />
 
-      <div className="relative z-10 flex flex-col items-center gap-6 text-center px-4">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-6 text-center px-4 py-8">
         <div>
           <p className="text-white text-xl font-normal">
             Seja bem vindo(a) ao Bibliotheca+,
@@ -76,8 +77,8 @@ const StudentHome = ({ userProfile }) => {
         </div>
 
         <div className="flex flex-col gap-3 items-center">
-          <ActionCard title="Acervo" onClick={() => console.log('Ir para Acervo')} />
-          <ActionCard title="Empréstimos" onClick={() => console.log('Ir para Empréstimos')} />
+          <ActionCard title="Acervo" onClick={() => navigate('/acervo')} />
+          <ActionCard title="Empréstimos" onClick={() => navigate('/meus-livros')} />
         </div>
 
         <div className="bg-black/50 border border-white/10 rounded-md px-6 py-4 text-left min-w-[260px]">
