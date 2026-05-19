@@ -4,10 +4,11 @@ import Login from "./pages/Login.jsx";
 import LibrarianHome from "./pages/Librarian/LibrarianHome.jsx";
 import StudentHome from "./pages/Student/StudentHome.jsx";
 import LibrarianBooks from "./pages/Librarian/LibrarianBooks.jsx";
+import StudentBooks from "./pages/Student/StudentBooks.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
-  const { user, loading, success } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -20,12 +21,8 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* Rota de Login com Redirecionamento Automático para Usuários Ativos */}
         <Route
           path="/login"
-            // Se tem user ativo com papel definido, vai para dashboard.
-            // Se tem user mas está pendente ou sem papel, fica no login
-            // (o Login.jsx mostrará o feedback de aprovação via success).
           element={
             user && user.papel && user.status === 'ativo'
               ? <Navigate to="/dashboard" replace />
@@ -33,7 +30,6 @@ export default function App() {
           }
         />
 
-        {/* Dashboard com Controle de Papéis (Bibliotecário ou Estudante) */}
         <Route
           path="/dashboard"
           element={
@@ -51,17 +47,19 @@ export default function App() {
           }
         />
 
-        {/* Nova Rota do Acervo Integrada ao LibrarianBooks */}
         <Route
           path="/acervo"
           element={
             <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
-              <LibrarianBooks />
+              {user?.papel === 'bibliotecario' ? (
+                <LibrarianBooks />
+              ) : (
+                <StudentBooks />
+              )}
             </ProtectedRoute>
           }
         />
 
-        {/* Rotas de Fallback e Redirecionamento Padrão */}
         <Route
           path="/"
           element={

@@ -140,11 +140,12 @@ export function AuthProvider({ children }) {
     setError(null);
     setSuccess(false);
     try {
-      // loginService valida status e regra de bibliotecário único
-      // e retorna o profile junto — sem depender do onAuthStateChange
-      const { profile, ...authData } = await loginService(email, password);
-      // onAuthStateChange (SIGNED_IN) também vai disparar e setar o user,
-      // mas como loginService já validou, não há risco de inconsistência
+      // O loginService valida o acesso e retorna o perfil estruturado
+      const { profile, user: authUser } = await loginService(email, password);
+      
+      // Força a atualização imediata dos estados locais para evitar a condição de corrida
+      setUser({ ...authUser, ...profile });
+      setLoading(false);
     } catch (err) {
       setError(err.message);
       setLoading(false);
