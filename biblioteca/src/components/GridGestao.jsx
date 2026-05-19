@@ -76,9 +76,9 @@ export default function GridGestao({
   }, [data, columns, searchTerm, sortConfig, isReadOnly]);
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full gap-4" onClick={() => onRowSelect && onRowSelect(null)}>
       {/* Barra de Pesquisa */}
-      <div className="w-full">
+      <div className="w-full" onClick={(e) => e.stopPropagation()}>
         <input
           type="text"
           placeholder="Pesquisar nesta tabela..."
@@ -130,7 +130,8 @@ export default function GridGestao({
                   className={`h-10 transition-colors cursor-pointer ${
                     isSelected ? "bg-blue-600/30 ring-2 ring-blue-500 ring-inset" : "hover:bg-white/5"
                   }`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (isReadOnly && onRowSelect) {
                       onRowSelect(originalIndex);
                     }

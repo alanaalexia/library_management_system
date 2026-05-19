@@ -145,10 +145,6 @@ export default function LibrarianBooks() {
 
       {/* Área interna de conteúdo técnico */}
       <div className="flex-1 flex flex-col p-6 relative overflow-hidden">
-        <header className="mb-4">
-          <h1 className="text-2xl font-bold">Gerenciamento do Acervo (LibrarianBooks)</h1>
-          <p className="text-sm text-slate-400">Clique no ícone de 3 linhas para selecionar e aperte Delete/Backspace para apagar localmente.</p>
-        </header>
 
         {erroValidacao && <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm">⚠️ {erroValidacao}</div>}
         {sucessoMsg && <div className="mb-4 p-3 bg-green-500/20 border border-green-500 rounded-lg text-green-400 text-sm">✓ {sucessoMsg}</div>}

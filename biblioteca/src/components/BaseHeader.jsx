@@ -40,8 +40,6 @@ export default function BaseHeader({ navigationLinks = [], notificationCount = 0
           )}
         </button>
 
-        <span className="h-5 w-[1px] bg-white/10" aria-hidden="true"></span>
-
         <button
           onClick={logout}
           className="text-red-400 hover:text-red-300 transition-colors"

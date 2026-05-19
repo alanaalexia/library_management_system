@@ -136,7 +136,9 @@ export default function Login() {
             <img src="/guaxinim.svg" alt="Logo" className="w-10 h-10 object-contain" />
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Biblioteca<span className="text-blue-500">+</span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent font-sans">
+              Biblioteca+
+            </span>
           </h1>
           <p className="text-slate-400 text-sm mt-2 font-medium">
             {mode === "login" ? "Que bom te ver de novo!" : "Crie sua conta na plataforma"}
