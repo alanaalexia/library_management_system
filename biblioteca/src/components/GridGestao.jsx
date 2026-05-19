@@ -1,5 +1,21 @@
 import React, { useState, useMemo } from "react";
 
+// Função que define quais colunas são combobox e suas opções
+const getComboboxConfig = (col) => {
+  const configs = {
+    status: ["disponível", "reservado", "emprestado"],
+  };
+  return configs[col] || null;
+};
+
+// Valor padrão por coluna para linhas novas
+const getDefaultValue = (col) => {
+  const defaults = {
+    status: "disponível",
+  };
+  return defaults[col] ?? "";
+};
+
 export default function GridGestao({ 
   data, 
   columns, 
@@ -20,7 +36,7 @@ export default function GridGestao({
         direction = "desc";
       } else if (sortConfig.direction === "desc") {
         direction = null;
-        key = null; // Reseta completamente o estado ao terceiro clique
+        key = null;
       }
     }
     setSortConfig({ key, direction });
@@ -31,7 +47,9 @@ export default function GridGestao({
 
     const hasEmptyLastRow = data.length > 0 && columns.every(col => {
       const val = data[data.length - 1][col];
-      return !val || val.toString().trim() === "";
+      // ignora defaults ao checar se linha está vazia
+      const defaultVal = getDefaultValue(col);
+      return !val || val.toString().trim() === "" || val === defaultVal;
     });
 
     let emptyLastRow = null;
@@ -74,6 +92,48 @@ export default function GridGestao({
 
     return dataWithIndex;
   }, [data, columns, searchTerm, sortConfig, isReadOnly]);
+
+  const renderCell = (col, row, originalIndex) => {
+  const options = getComboboxConfig(col);
+  const isLocked = col.includes("id_") || col.includes("_em");
+  const value = row[col] ?? getDefaultValue(col);
+  const isLastRow = originalIndex === data.length - 1;
+
+  // Na última linha, só mostra combobox se outra coluna estiver preenchida ou linha selecionada
+  const outrasColunas = columns.filter(c => c !== col && !getComboboxConfig(c));
+  const temConteudo = outrasColunas.some(c => row[c] && row[c].toString().trim() !== "");
+  const mostrarCombobox = !isLastRow || temConteudo || selectedRowIndex === originalIndex;
+
+  // Combobox (edição)
+  if (options && !isReadOnly && !isLocked && mostrarCombobox) {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
+        className="w-full h-full bg-transparent px-3 outline-none text-sm text-center text-white focus:bg-blue-900/30 cursor-pointer"
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt} className="bg-slate-800 text-white">
+            {opt}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // Input normal
+  return (
+    <input
+      readOnly={isReadOnly || isLocked}
+      value={options && !mostrarCombobox ? "" : value}
+      onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
+      className={`w-full h-full bg-transparent px-3 outline-none text-sm text-center
+        ${isReadOnly ? "cursor-default" : "focus:bg-blue-900/30"}
+        ${isLocked ? "text-slate-500 bg-slate-800/20" : ""}
+      `}
+    />
+  );
+};
 
   return (
     <div className="flex flex-col h-full gap-4" onClick={() => onRowSelect && onRowSelect(null)}>
@@ -121,7 +181,11 @@ export default function GridGestao({
               const isSelected = selectedRowIndex === originalIndex;
               
               const isLastRowInOriginal = originalIndex === data.length - 1;
-              const isRowEmpty = columns.every(col => !row[col] || row[col].toString().trim() === "");
+              const isRowEmpty = columns.every(col => {
+                const val = row[col];
+                const def = getDefaultValue(col);
+                return !val || val.toString().trim() === "" || val === def;
+              });
               const showIcon = !(isLastRowInOriginal && isRowEmpty && !isSelected);
 
               return (
@@ -140,9 +204,7 @@ export default function GridGestao({
                   <td 
                     className="p-0 border-r border-white/5 text-center align-middle"
                     onClick={(e) => {
-                      if (!isReadOnly) {
-                        e.stopPropagation();
-                      }
+                      if (!isReadOnly) e.stopPropagation();
                       if (onRowSelect) onRowSelect(originalIndex);
                     }}
                   >
@@ -157,15 +219,7 @@ export default function GridGestao({
                   
                   {columns.map((col) => (
                     <td key={col} className="p-0 border-r border-white/5">
-                      <input
-                        readOnly={isReadOnly || col.includes("id_") || col.includes("_em")}
-                        value={row[col] || ""}
-                        onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
-                        className={`w-full h-full bg-transparent px-3 outline-none text-sm text-center
-                          ${isReadOnly ? "cursor-default" : "focus:bg-blue-900/30"}
-                          ${(col.includes("id_") || col.includes("_em")) ? "text-slate-500 bg-slate-800/20" : ""}
-                        `}
-                      />
+                      {renderCell(col, row, originalIndex)}
                     </td>
                   ))}
                 </tr>

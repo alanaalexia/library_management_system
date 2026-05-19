@@ -5,6 +5,10 @@ import { Botao } from "../../components/Botoes";
 import LibrarianHeader from "./LibrarianHeader";
 
 const COLUNAS_ACERVO = ["isbn", "titulo", "autor", "editora", "idioma", "status"];
+// Para definir as colunas que terão linhas com combobox e suas opções
+const configs = {
+  status: ["disponível", "reservado", "emprestado"],
+};
 
 export default function LibrarianBooks() {
   const [dados, setDados] = useState([]);
