@@ -38,6 +38,7 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('[Auth event]', event, 'session:', session);
         console.debug('[Auth event]', event);
 
         // SIGNED_UP: disparado pelo signUp() com autoconfirm desligado.
@@ -51,53 +52,58 @@ export function AuthProvider({ children }) {
         // mas o perfil não existe ainda na tabela pessoa, aguardamos
         // um momento e tentamos novamente.
         if (event === 'SIGNED_IN' && session?.user) {
-          // Tenta buscar o perfil — pode ser que register() ainda não
-          // terminou de inserir. Tentamos até 3 vezes com intervalo.
-          let profile = null;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            const { data } = await supabase
-              .from('pessoa')
-              .select('*')
-              .eq('id_pessoa', session.user.id)
-              .maybeSingle();
+          // Solta o callback imediatamente e processa depois
+          setTimeout(async () => {
+            try {
+              let profile = null;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                console.log(`[SIGNED_IN] tentativa ${attempt + 1}`);
+                const { data } = await supabase
+                  .from('pessoa')
+                  .select('*')
+                  .eq('id_pessoa', session.user.id)
+                  .maybeSingle();
 
-            if (data) {
-              profile = data;
-              break;
+                console.log('[SIGNED_IN] data:', data);
+                if (data) { profile = data; break; }
+                if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
+              }
+
+              if (profile) {
+                await syncOrCreateUser(session.user);
+                setUser({ ...session.user, ...profile });
+              } else {
+                console.error('Perfil não encontrado após cadastro.');
+                setUser(null);
+              }
+            } catch (err) {
+              console.error('[SIGNED_IN] erro:', err);
+              setUser(null);
+            } finally {
+              setLoading(false);
             }
-
-            // Perfil ainda não existe — aguarda e tenta novamente
-            if (attempt < 2) {
-              await new Promise(resolve => setTimeout(resolve, 800));
-            }
-          }
-
-          if (profile) {
-            // Só seta o user se o status for ativo
-            // (login() em authService já faz a validação e desloga se necessário,
-            //  mas OAuth pode chegar aqui sem passar pelo login())
-            await syncOrCreateUser(session.user);
-            setUser({ ...session.user, ...profile });
-          } else {
-            // Perfil não encontrado após 3 tentativas (não deveria acontecer)
-            console.error('Perfil não encontrado após cadastro.');
-            setUser(null);
-          }
-
-          setLoading(false);
+          }, 0);
           return;
         }
 
-        if (event === 'INITIAL_SESSION') {
-          if (session?.user) {
-            const profile = await fetchProfile(session.user);
-            setUser(profile ? { ...session.user, ...profile } : null);
-          } else {
-            setUser(null);
+          if (event === 'INITIAL_SESSION') {
+            setTimeout(async () => {
+              try {
+                if (session?.user) {
+                  const profile = await fetchProfile(session.user);
+                  setUser(profile ? { ...session.user, ...profile } : null);
+                } else {
+                  setUser(null);
+                }
+              } catch (err) {
+                console.error('Erro crítico no INITIAL_SESSION:', err);
+                setUser(null);
+              } finally {
+                setLoading(false);
+              }
+            }, 0);
+            return;
           }
-          setLoading(false);
-          return;
-        }
 
         if (event === 'TOKEN_REFRESHED') {
           // Apenas atualiza o token, não rebusca perfil

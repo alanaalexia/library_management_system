@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
   const { user, loading } = useAuth();
+  console.log('[App] loading:', loading, 'user:', user);
 
   if (loading) {
     return (

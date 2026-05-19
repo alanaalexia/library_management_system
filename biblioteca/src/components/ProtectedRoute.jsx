@@ -7,25 +7,35 @@ const ProtectedRoute = ({ user, requiredRole, children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("ProtectedRoute: useEffect disparado, usuário:", user);
+
     const fetchUserRole = async () => {
-      if (!user) {
+      if (!user || !user.id) {
+        console.log("ProtectedRoute: Usuário não identificado, encerrando loading.");
         setLoading(false);
         return;
       }
 
-      const { data, error } = await supabase
-        .from("pessoa")
-        .select("papel")
-        .eq("id_pessoa", user.id)
-        .single();
+      try {
+        console.log("ProtectedRoute: Buscando papel no banco...");
+        const { data, error } = await supabase
+          .from("pessoa")
+          .select("papel")
+          .eq("id_pessoa", user.id)
+          .single();
 
-      if (error) {
-        console.error("Erro ao buscar papel do usuário:", error.message);
-      } else {
-        setRole(data?.papel);
+        if (error) {
+          console.error("ProtectedRoute: Erro na consulta:", error);
+        } else {
+          console.log("ProtectedRoute: Papel retornado:", data?.papel);
+          setRole(data?.papel);
+        }
+      } catch (err) {
+        console.error("ProtectedRoute: Erro crítico:", err);
+      } finally {
+        console.log("ProtectedRoute: Finalizando loading.");
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchUserRole();
@@ -40,7 +50,7 @@ const ProtectedRoute = ({ user, requiredRole, children }) => {
   }
 
   if (requiredRole && role !== requiredRole) {
-    // Se o usuário não tiver o papel exigido pela rota, volta para a raiz
+    console.log(`ProtectedRoute: Acesso negado. Requerido: ${requiredRole}, Atual: ${role}`);
     return <Navigate to="/" replace />;
   }
 
