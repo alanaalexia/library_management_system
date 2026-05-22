@@ -4,6 +4,14 @@ import GridGestao from "./GridGestao";
 import { Botao } from "./Botoes";
 
 const COLUNAS_ACERVO = ["isbn", "titulo", "autor", "editora", "idioma", "status"];
+const LABELS_ACERVO = {
+  isbn: "ISBN",
+  titulo: "Título",
+  autor: "Autor",
+  editora: "Editora",
+  idioma: "Idioma",
+  status: "Status",
+};
 
 const COMBOBOX_ACERVO = {
   status: {
@@ -140,7 +148,7 @@ export default function BooksManagement({ mode }) {
       return;
     }
     const livro = dados[selectedRowIndex];
-    if (livro.status !== "disponível") {
+    if (livro.status !== "Disponível") {
       setMsg({ tipo: "erro", texto: "Este livro não está disponível para reserva." });
       return;
     }
@@ -161,16 +169,6 @@ export default function BooksManagement({ mode }) {
 
   return (
     <div className="flex-1 flex flex-col p-6 relative overflow-hidden">
-      <header className="mb-4">
-        <h1 className="text-2xl font-bold">
-          {isLibrarian ? "Gerenciamento do Acervo" : "Consulta de Acervo"}
-        </h1>
-        <p className="text-sm text-slate-400">
-          {isLibrarian
-            ? "Clique no ícone de 3 linhas para selecionar e aperte Delete/Backspace para apagar."
-            : "Clique em qualquer local de uma linha para selecionar o livro desejado."}
-        </p>
-      </header>
 
       {msg.texto && (
         <div className={`mb-4 p-3 border rounded-lg text-sm font-semibold ${
@@ -191,6 +189,7 @@ export default function BooksManagement({ mode }) {
           selectedRowIndex={selectedRowIndex}
           onRowSelect={setSelectedRowIndex}
           comboboxConfig={COMBOBOX_ACERVO}
+          columnLabels={LABELS_ACERVO}
         />
       </div>
 

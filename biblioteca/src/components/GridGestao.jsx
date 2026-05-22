@@ -7,7 +7,8 @@ export default function GridGestao({
   isReadOnly, 
   selectedRowIndex, 
   onRowSelect,
-  comboboxConfig = {} // { nomeColuna: { options: [...], default: "..." } }
+  comboboxConfig = {}, // { nomeColuna: { options: [...], default: "..." } }
+  columnLabels = {}
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -26,48 +27,47 @@ export default function GridGestao({
   };
 
   const processedData = useMemo(() => {
-    let dataWithIndex = data.map((row, index) => ({ ...row, _originalIndex: index }));
+  let dataWithIndex = data.map((row, index) => ({ ...row, _originalIndex: index }));
 
-    const hasEmptyLastRow = data.length > 0 && columns.every(col => {
-      const val = data[data.length - 1][col];
-      const def = getDefault(col);
-      return !val || val.toString().trim() === "" || val === def;
+  const hasEmptyLastRow = data.length > 0 && columns.every(col => {
+    const val = data[data.length - 1][col];
+    const def = getDefault(col);
+    return !val || val.toString().trim() === "" || val === def;
+  });
+
+  // Remove a linha vazia antes de qualquer operação
+  let emptyLastRow = null;
+  if (hasEmptyLastRow) {
+    emptyLastRow = dataWithIndex.pop();
+  }
+
+  if (searchTerm.trim() !== "") {
+    const lowSearch = searchTerm.toLowerCase();
+    dataWithIndex = dataWithIndex.filter((row) =>
+      columns.some((col) => {
+        const val = row[col];
+        return val && val.toString().toLowerCase().includes(lowSearch);
+      })
+    );
+  }
+
+  if (sortConfig.key && sortConfig.direction) {
+    dataWithIndex.sort((a, b) => {
+      const valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : "";
+      const valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : "";
+      if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
     });
+  }
 
-    let emptyLastRow = null;
-    if (hasEmptyLastRow && !isReadOnly) emptyLastRow = dataWithIndex.pop();
+  // Só recoloca a linha vazia se estiver em modo edição
+  if (emptyLastRow && !isReadOnly) {
+    dataWithIndex.push(emptyLastRow);
+  }
 
-    if (searchTerm.trim() !== "") {
-      const lowSearch = searchTerm.toLowerCase();
-      dataWithIndex = dataWithIndex.filter((row) =>
-        columns.some((col) => {
-          const val = row[col];
-          return val && val.toString().toLowerCase().includes(lowSearch);
-        })
-      );
-    }
-
-    if (sortConfig.key && sortConfig.direction) {
-      dataWithIndex.sort((a, b) => {
-        const valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : "";
-        const valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : "";
-        if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
-        if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-
-    if (emptyLastRow && !isReadOnly) dataWithIndex.push(emptyLastRow);
-
-    if (isReadOnly && hasEmptyLastRow) {
-      dataWithIndex = dataWithIndex.filter(row => {
-        const isRowEmpty = columns.every(col => !row[col] || row[col].toString().trim() === "");
-        return !isRowEmpty;
-      });
-    }
-
-    return dataWithIndex;
-  }, [data, columns, searchTerm, sortConfig, isReadOnly, comboboxConfig]);
+  return dataWithIndex;
+}, [data, columns, searchTerm, sortConfig, isReadOnly, comboboxConfig]);
 
   const renderCell = (col, row, originalIndex) => {
     const options = getOptions(col);
@@ -108,7 +108,7 @@ export default function GridGestao({
 
   return (
     <div className="flex flex-col h-full gap-4" onClick={() => onRowSelect && onRowSelect(null)}>
-      <div className="w-full" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full flex justify-center" onClick={(e) => e.stopPropagation()}>
         <input
           type="text"
           placeholder="Pesquisar nesta tabela..."
@@ -132,7 +132,7 @@ export default function GridGestao({
                     className="p-3 border-r border-blue-800 text-white font-semibold text-center cursor-pointer hover:bg-blue-800 transition-colors"
                   >
                     <div className="flex items-center justify-center gap-1.5">
-                      <span>{col}</span>
+                      <span>{columnLabels[col] || col}</span>
                       <span className="text-[11px] text-blue-300 font-mono tracking-tighter">
                         {isSorted && sortConfig.direction === "asc" && "▲"}
                         {isSorted && sortConfig.direction === "desc" && "▼"}
