@@ -16,12 +16,12 @@ const LibrarianHome = ({ userProfile }) => {
       try {
         setLoading(true);
 
-        // Contagem de novos estudantes pendentes de confirmação
+        // Contagem de novos estudantes Pendentes de confirmação
         const { count: pendingCount, error: errorPending } = await supabase
           .from('pessoa')
           .select('*', { count: 'exact', head: true })
           .eq('papel', 'cliente')
-          .eq('status', 'pendente');
+          .eq('status', 'Pendente');
 
         // Contagem de estudantes suspensos
         const { count: suspendedCount, error: errorSuspended } = await supabase
@@ -88,7 +88,7 @@ const LibrarianHome = ({ userProfile }) => {
             <span className="font-semibold text-yellow-400">
               {loading ? '—' : pendingStudents}
             </span>
-            <span className="text-white/90">Estudante(s) pendente(s) de confirmação.</span>
+            <span className="text-white/90">Estudante(s) Pendente(s) de confirmação.</span>
           </div>
           
           <div className="flex items-center gap-2 py-1 text-sm mb-1">

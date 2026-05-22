@@ -18,15 +18,15 @@ export const getEstudantesComAtrasados = async () => {
 };
 
 /**
- * Conta quantos estudantes estão com cadastro pendente de aprovação
- * @returns {Promise<number>} Quantidade de pessoas com papel 'cliente' e status 'pendente'
+ * Conta quantos estudantes estão com cadastro Pendente de aprovação
+ * @returns {Promise<number>} Quantidade de pessoas com papel 'cliente' e status 'Pendente'
  */
 export const getEstudantesPendentes = async () => {
   const { count, error } = await supabase
     .from('pessoa')
     .select('id_pessoa', { count: 'exact' })
     .eq('papel', 'cliente')
-    .eq('status', 'pendente');
+    .eq('status', 'Pendente');
 
   if (error) throw error;
   return count || 0;

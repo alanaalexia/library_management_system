@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from "react";
 
-export default function GridGestao({ 
+export default function BaseTable({ 
   data, 
   columns, 
   onCellChange, 
   isReadOnly, 
   selectedRowIndex, 
   onRowSelect,
-  comboboxConfig = {}, // { nomeColuna: { options: [...], default: "..." } }
-  columnLabels = {}
+  comboboxConfig = {},
+  columnLabels = {},
+  allowNewRow = true
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -27,47 +28,45 @@ export default function GridGestao({
   };
 
   const processedData = useMemo(() => {
-  let dataWithIndex = data.map((row, index) => ({ ...row, _originalIndex: index }));
+    let dataWithIndex = data.map((row, index) => ({ ...row, _originalIndex: index }));
 
-  const hasEmptyLastRow = data.length > 0 && columns.every(col => {
-    const val = data[data.length - 1][col];
-    const def = getDefault(col);
-    return !val || val.toString().trim() === "" || val === def;
-  });
-
-  // Remove a linha vazia antes de qualquer operação
-  let emptyLastRow = null;
-  if (hasEmptyLastRow) {
-    emptyLastRow = dataWithIndex.pop();
-  }
-
-  if (searchTerm.trim() !== "") {
-    const lowSearch = searchTerm.toLowerCase();
-    dataWithIndex = dataWithIndex.filter((row) =>
-      columns.some((col) => {
-        const val = row[col];
-        return val && val.toString().toLowerCase().includes(lowSearch);
-      })
-    );
-  }
-
-  if (sortConfig.key && sortConfig.direction) {
-    dataWithIndex.sort((a, b) => {
-      const valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : "";
-      const valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : "";
-      if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
-      if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
+    const hasEmptyLastRow = data.length > 0 && columns.every(col => {
+      const val = data[data.length - 1][col];
+      const def = getDefault(col);
+      return !val || val.toString().trim() === "" || val === def;
     });
-  }
 
-  // Só recoloca a linha vazia se estiver em modo edição
-  if (emptyLastRow && !isReadOnly) {
-    dataWithIndex.push(emptyLastRow);
-  }
+    let emptyLastRow = null;
+    if (hasEmptyLastRow) {
+      emptyLastRow = dataWithIndex.pop();
+    }
 
-  return dataWithIndex;
-}, [data, columns, searchTerm, sortConfig, isReadOnly, comboboxConfig]);
+    if (searchTerm.trim() !== "") {
+      const lowSearch = searchTerm.toLowerCase();
+      dataWithIndex = dataWithIndex.filter((row) =>
+        columns.some((col) => {
+          const val = row[col];
+          return val && val.toString().toLowerCase().includes(lowSearch);
+        })
+      );
+    }
+
+    if (sortConfig.key && sortConfig.direction) {
+      dataWithIndex.sort((a, b) => {
+        const valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : "";
+        const valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : "";
+        if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    if (emptyLastRow && !isReadOnly && allowNewRow) {
+      dataWithIndex.push(emptyLastRow);
+    }
+
+    return dataWithIndex;
+  }, [data, columns, searchTerm, sortConfig, isReadOnly, comboboxConfig, allowNewRow]);
 
   const renderCell = (col, row, originalIndex) => {
     const options = getOptions(col);

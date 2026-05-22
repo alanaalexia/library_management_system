@@ -24,7 +24,7 @@ export const reservarLivro = async (idLivro, idUsuario) => {
       id_cliente: cliente.id_cliente,
       id_livro: idLivro,
       prazo_validade: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 dias
-      status: 'pendente'
+      status: 'Pendente'
     }
   ]);
   if (error) throw error;

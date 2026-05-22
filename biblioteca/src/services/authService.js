@@ -25,7 +25,7 @@ const validarAcesso = async (profile) => {
     throw new Error('Perfil não encontrado. Entre em contato com o bibliotecário.');
   }
 
-  if (profile.status !== 'ativo') {
+  if (profile.status !== 'Ativo') {
     throw new Error('Seu cadastro está aguardando aprovação do bibliotecário.');
   }
 
@@ -95,7 +95,7 @@ export const syncOrCreateUser = async (user) => {
   const email = user.email.toLowerCase();
   const eInstitucional = DOMINIOS_INSTITUCIONAIS.some(dom => email.endsWith(dom));
   const papel = eInstitucional ? 'bibliotecario' : 'cliente';
-  const status = eInstitucional ? 'ativo' : 'pendente';
+  const status = eInstitucional ? 'Ativo' : 'Pendente';
   const nome =
     user.user_metadata?.full_name ||
     user.user_metadata?.name ||
@@ -127,7 +127,7 @@ export const register = async (userData) => {
       userData.email.toLowerCase().endsWith(dom)
     );
     const statusInicial =
-      userData.papel === 'bibliotecario' && eInstitucional ? 'ativo' : 'pendente';
+      userData.papel === 'bibliotecario' && eInstitucional ? 'Ativo' : 'Pendente';
 
     const { error: dbError } = await supabase
       .from('pessoa')

@@ -6,6 +6,7 @@ import StudentHome from "./pages/Student/StudentHome.jsx";
 import LibrarianBooks from "./pages/Librarian/LibrarianBooks.jsx";
 import StudentBooks from "./pages/Student/StudentBooks.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import LibrarianStudents from "./pages/Librarian/LibrarianStudents.jsx";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -25,7 +26,7 @@ export default function App() {
         <Route
           path="/login"
           element={
-            user && user.papel && user.status === 'ativo'
+            user && user.papel && user.status === 'Ativo'
               ? <Navigate to="/dashboard" replace />
               : <Login />
           }
@@ -34,7 +35,7 @@ export default function App() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
+            <ProtectedRoute user={user && user.status === 'Ativo' ? user : null}>
               {!user?.papel ? (
                 <div className="h-screen flex items-center justify-center bg-black">
                   <span className="text-white text-lg">Carregando perfil...</span>
@@ -51,7 +52,7 @@ export default function App() {
         <Route
           path="/acervo"
           element={
-            <ProtectedRoute user={user && user.status === 'ativo' ? user : null}>
+            <ProtectedRoute user={user && user.status === 'Ativo' ? user : null}>
               {user?.papel === 'bibliotecario' ? (
                 <LibrarianBooks />
               ) : (
@@ -62,10 +63,19 @@ export default function App() {
         />
 
         <Route
+          path="/usuarios"
+          element={
+            <ProtectedRoute user={user && user.status === 'Ativo' ? user : null} requiredRole="bibliotecario">
+              <LibrarianStudents />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/"
           element={
             <Navigate
-              to={user && user.papel && user.status === 'ativo' ? '/dashboard' : '/login'}
+              to={user && user.papel && user.status === 'Ativo' ? '/dashboard' : '/login'}
               replace
             />
           }
@@ -74,7 +84,7 @@ export default function App() {
           path="*"
           element={
             <Navigate
-              to={user && user.papel && user.status === 'ativo' ? '/dashboard' : '/login'}
+              to={user && user.papel && user.status === 'Ativo' ? '/dashboard' : '/login'}
               replace
             />
           }

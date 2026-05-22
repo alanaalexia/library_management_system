@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../services/supabaseClient";
-import GridGestao from "./GridGestao";
+import BaseTable from "./BaseTable";
 import { Botao } from "./Botoes";
 
 const COLUNAS_ACERVO = ["isbn", "titulo", "autor", "editora", "idioma", "status"];
@@ -181,7 +181,7 @@ export default function BooksManagement({ mode }) {
       )}
 
       <div className="flex-1 overflow-hidden mb-20">
-        <GridGestao
+        <BaseTable
           data={dados}
           columns={COLUNAS_ACERVO}
           onCellChange={isLibrarian ? handleCellChange : () => {}}
@@ -190,6 +190,7 @@ export default function BooksManagement({ mode }) {
           onRowSelect={setSelectedRowIndex}
           comboboxConfig={COMBOBOX_ACERVO}
           columnLabels={LABELS_ACERVO}
+          allowNewRow={true}
         />
       </div>
 
