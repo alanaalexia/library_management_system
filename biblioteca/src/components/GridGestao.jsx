@@ -1,43 +1,26 @@
 import React, { useState, useMemo } from "react";
 
-// Função que define quais colunas são combobox e suas opções
-const getComboboxConfig = (col) => {
-  const configs = {
-    status: ["disponível", "reservado", "emprestado"],
-  };
-  return configs[col] || null;
-};
-
-// Valor padrão por coluna para linhas novas
-const getDefaultValue = (col) => {
-  const defaults = {
-    status: "disponível",
-  };
-  return defaults[col] ?? "";
-};
-
 export default function GridGestao({ 
   data, 
   columns, 
   onCellChange, 
   isReadOnly, 
   selectedRowIndex, 
-  onRowSelect 
+  onRowSelect,
+  comboboxConfig = {} // { nomeColuna: { options: [...], default: "..." } }
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
+  const getOptions = (col) => comboboxConfig[col]?.options || null;
+  const getDefault = (col) => comboboxConfig[col]?.default ?? "";
+
   const handleSort = (column) => {
     let direction = "asc";
     let key = column;
-
     if (sortConfig.key === column) {
-      if (sortConfig.direction === "asc") {
-        direction = "desc";
-      } else if (sortConfig.direction === "desc") {
-        direction = null;
-        key = null;
-      }
+      if (sortConfig.direction === "asc") direction = "desc";
+      else if (sortConfig.direction === "desc") { direction = null; key = null; }
     }
     setSortConfig({ key, direction });
   };
@@ -47,16 +30,12 @@ export default function GridGestao({
 
     const hasEmptyLastRow = data.length > 0 && columns.every(col => {
       const val = data[data.length - 1][col];
-      // ignora defaults ao checar se linha está vazia
-      const defaultVal = getDefaultValue(col);
-      return !val || val.toString().trim() === "" || val === defaultVal;
+      const def = getDefault(col);
+      return !val || val.toString().trim() === "" || val === def;
     });
 
     let emptyLastRow = null;
-    
-    if (hasEmptyLastRow && !isReadOnly) {
-      emptyLastRow = dataWithIndex.pop();
-    }
+    if (hasEmptyLastRow && !isReadOnly) emptyLastRow = dataWithIndex.pop();
 
     if (searchTerm.trim() !== "") {
       const lowSearch = searchTerm.toLowerCase();
@@ -72,16 +51,13 @@ export default function GridGestao({
       dataWithIndex.sort((a, b) => {
         const valA = a[sortConfig.key] ? a[sortConfig.key].toString().toLowerCase() : "";
         const valB = b[sortConfig.key] ? b[sortConfig.key].toString().toLowerCase() : "";
-
         if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
         if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
 
-    if (emptyLastRow && !isReadOnly) {
-      dataWithIndex.push(emptyLastRow);
-    }
+    if (emptyLastRow && !isReadOnly) dataWithIndex.push(emptyLastRow);
 
     if (isReadOnly && hasEmptyLastRow) {
       dataWithIndex = dataWithIndex.filter(row => {
@@ -91,53 +67,47 @@ export default function GridGestao({
     }
 
     return dataWithIndex;
-  }, [data, columns, searchTerm, sortConfig, isReadOnly]);
+  }, [data, columns, searchTerm, sortConfig, isReadOnly, comboboxConfig]);
 
   const renderCell = (col, row, originalIndex) => {
-  const options = getComboboxConfig(col);
-  const isLocked = col.includes("id_") || col.includes("_em");
-  const value = row[col] ?? getDefaultValue(col);
-  const isLastRow = originalIndex === data.length - 1;
+    const options = getOptions(col);
+    const isLocked = col.includes("id_") || col.includes("_em");
+    const value = row[col] ?? getDefault(col);
+    const isLastRow = originalIndex === data.length - 1;
 
-  // Na última linha, só mostra combobox se outra coluna estiver preenchida ou linha selecionada
-  const outrasColunas = columns.filter(c => c !== col && !getComboboxConfig(c));
-  const temConteudo = outrasColunas.some(c => row[c] && row[c].toString().trim() !== "");
-  const mostrarCombobox = !isLastRow || temConteudo || selectedRowIndex === originalIndex;
+    const outrasColunas = columns.filter(c => c !== col && !getOptions(c));
+    const temConteudo = outrasColunas.some(c => row[c] && row[c].toString().trim() !== "");
+    const mostrarCombobox = !isLastRow || temConteudo || selectedRowIndex === originalIndex;
 
-  // Combobox (edição)
-  if (options && !isReadOnly && !isLocked && mostrarCombobox) {
+    if (options && !isReadOnly && !isLocked && mostrarCombobox) {
+      return (
+        <select
+          value={value}
+          onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
+          className="w-full h-full bg-transparent px-3 outline-none text-sm text-center text-white focus:bg-blue-900/30 cursor-pointer"
+        >
+          {options.map((opt) => (
+            <option key={opt} value={opt} className="bg-slate-800 text-white">{opt}</option>
+          ))}
+        </select>
+      );
+    }
+
     return (
-      <select
-        value={value}
+      <input
+        readOnly={isReadOnly || isLocked}
+        value={options && !mostrarCombobox ? "" : value}
         onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
-        className="w-full h-full bg-transparent px-3 outline-none text-sm text-center text-white focus:bg-blue-900/30 cursor-pointer"
-      >
-        {options.map((opt) => (
-          <option key={opt} value={opt} className="bg-slate-800 text-white">
-            {opt}
-          </option>
-        ))}
-      </select>
+        className={`w-full h-full bg-transparent px-3 outline-none text-sm text-center
+          ${isReadOnly ? "cursor-default" : "focus:bg-blue-900/30"}
+          ${isLocked ? "text-slate-500 bg-slate-800/20" : ""}
+        `}
+      />
     );
-  }
-
-  // Input normal
-  return (
-    <input
-      readOnly={isReadOnly || isLocked}
-      value={options && !mostrarCombobox ? "" : value}
-      onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
-      className={`w-full h-full bg-transparent px-3 outline-none text-sm text-center
-        ${isReadOnly ? "cursor-default" : "focus:bg-blue-900/30"}
-        ${isLocked ? "text-slate-500 bg-slate-800/20" : ""}
-      `}
-    />
-  );
-};
+  };
 
   return (
     <div className="flex flex-col h-full gap-4" onClick={() => onRowSelect && onRowSelect(null)}>
-      {/* Barra de Pesquisa */}
       <div className="w-full" onClick={(e) => e.stopPropagation()}>
         <input
           type="text"
@@ -148,7 +118,6 @@ export default function GridGestao({
         />
       </div>
 
-      {/* Container da Tabela */}
       <div className="flex-1 overflow-y-auto border border-white/10 rounded-lg bg-slate-900/30 shadow-inner">
         <table className="w-full border-separate border-spacing-0">
           <thead className="sticky top-0 z-20 bg-blue-700">
@@ -157,8 +126,8 @@ export default function GridGestao({
               {columns.map((col) => {
                 const isSorted = sortConfig.key === col && sortConfig.direction !== null;
                 return (
-                  <th 
-                    key={col} 
+                  <th
+                    key={col}
                     onClick={() => handleSort(col)}
                     className="p-3 border-r border-blue-800 text-white font-semibold text-center cursor-pointer hover:bg-blue-800 transition-colors"
                   >
@@ -179,29 +148,26 @@ export default function GridGestao({
             {processedData.map((row, rowIndex) => {
               const originalIndex = row._originalIndex;
               const isSelected = selectedRowIndex === originalIndex;
-              
               const isLastRowInOriginal = originalIndex === data.length - 1;
               const isRowEmpty = columns.every(col => {
                 const val = row[col];
-                const def = getDefaultValue(col);
+                const def = getDefault(col);
                 return !val || val.toString().trim() === "" || val === def;
               });
               const showIcon = !(isLastRowInOriginal && isRowEmpty && !isSelected);
 
               return (
-                <tr 
-                  key={rowIndex} 
+                <tr
+                  key={rowIndex}
                   className={`h-10 transition-colors cursor-pointer ${
                     isSelected ? "bg-blue-600/30 ring-2 ring-blue-500 ring-inset" : "hover:bg-white/5"
                   }`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (isReadOnly && onRowSelect) {
-                      onRowSelect(originalIndex);
-                    }
+                    if (isReadOnly && onRowSelect) onRowSelect(originalIndex);
                   }}
                 >
-                  <td 
+                  <td
                     className="p-0 border-r border-white/5 text-center align-middle"
                     onClick={(e) => {
                       if (!isReadOnly) e.stopPropagation();
@@ -216,7 +182,6 @@ export default function GridGestao({
                       </div>
                     )}
                   </td>
-                  
                   {columns.map((col) => (
                     <td key={col} className="p-0 border-r border-white/5">
                       {renderCell(col, row, originalIndex)}
