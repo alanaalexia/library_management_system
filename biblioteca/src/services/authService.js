@@ -54,7 +54,11 @@ const marcarLogado = async (userId) => {
     .from('bibliotecario')
     .update({ esta_logado: true })
     .eq('id_pessoa', userId);
-  if (error) throw error;
+  if (error) {
+    console.error('Erro ao marcar bibliotecário como logado:', error);
+    throw error;
+  }
+  console.log('Bibliotecário marcado como logado:', userId);
 };
 
 /**
@@ -64,10 +68,12 @@ const marcarLogado = async (userId) => {
  */
 export const marcarDeslogado = async (userId) => {
   try {
-    await supabase
+    const { error } = await supabase
       .from('bibliotecario')
       .update({ esta_logado: false })
       .eq('id_pessoa', userId);
+    if (error) throw error;
+    console.log('Bibliotecário marcado como deslogado:', userId);
   } catch (err) {
     console.warn('Erro ao marcar bibliotecário como deslogado:', err.message);
   }
@@ -180,7 +186,11 @@ export const logout = async (userId, papel) => {
     await marcarDeslogado(userId);
   }
   const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  if (error) {
+    console.error('Erro ao fazer logout:', error);
+    throw error;
+  }
+  console.log('Logout realizado com sucesso');
 };
 
 export const signInWithGoogle = async () => {

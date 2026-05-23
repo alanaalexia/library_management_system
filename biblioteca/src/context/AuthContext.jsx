@@ -85,7 +85,17 @@ export function AuthProvider({ children }) {
                   }
 
                   // Se passou, marca como logado no banco
-                  await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
+                  try {
+                    const { error: updateError } = await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
+                    if (updateError) throw updateError;
+                    console.log('Bibliotecário marcado como logado via SIGNED_IN:', profile.id_pessoa);
+                  } catch (updateErr) {
+                    console.error('Erro ao marcar bibliotecário como logado:', updateErr);
+                    await supabase.auth.signOut();
+                    setUser(null);
+                    setError('Erro ao processar login do bibliotecário. Tente novamente.');
+                    return;
+                  }
                 }
 
                 // Se passou em todas as regras, aceita o usuário no estado global
@@ -113,6 +123,16 @@ export function AuthProvider({ children }) {
                 
                 // Valida o status também na sessão inicial (F5 na página)
                 if (profile && profile.status === 'Ativo') {
+                  // Se for bibliotecário, marca como logado no banco
+                  if (profile.papel === 'bibliotecario') {
+                    try {
+                      const { error: updateError } = await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
+                      if (updateError) throw updateError;
+                      console.log('Bibliotecário marcado como logado via INITIAL_SESSION:', profile.id_pessoa);
+                    } catch (updateErr) {
+                      console.error('Erro ao marcar bibliotecário como logado em INITIAL_SESSION:', updateErr);
+                    }
+                  }
                   setUser({ ...session.user, ...profile });
                 } else {
                   if (session) await supabase.auth.signOut();
@@ -205,6 +225,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       await logoutService(user?.id_pessoa, user?.papel);
+      setLoading(false);
     } catch (err) {
       setError(err.message);
       setLoading(false);
