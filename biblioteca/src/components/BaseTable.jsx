@@ -1,15 +1,36 @@
 import React, { useState, useMemo } from "react";
 
-export default function BaseTable({ 
-  data, 
-  columns, 
-  onCellChange, 
-  isReadOnly, 
-  selectedRowIndex, 
+/**
+ * BaseTable
+ *
+ * Props existentes (mantidas):
+ *  - data, columns, onCellChange, isReadOnly, selectedRowIndex, onRowSelect
+ *  - comboboxConfig, columnLabels, allowNewRow
+ *
+ * Props novas:
+ *  - extraColumns: array de configurações de colunas extras com botões
+ *    [
+ *      {
+ *        label: "Emprestar",           // nome do cabeçalho
+ *        position: "right",            // "right" ou índice numérico (futuro)
+ *        buttonLabel: "Emprestar",     // texto do botão
+ *        buttonColor: "#2563eb",       // cor do botão (hex ou tailwind bg)
+ *        showWhen: { key, value },     // ex: { key: "status", value: "Reservado" }
+ *        onClick: (row) => {},         // callback com a linha clicada
+ *      }
+ *    ]
+ */
+export default function BaseTable({
+  data,
+  columns,
+  onCellChange,
+  isReadOnly,
+  selectedRowIndex,
   onRowSelect,
   comboboxConfig = {},
   columnLabels = {},
-  allowNewRow = true
+  allowNewRow = true,
+  extraColumns = [],
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -105,6 +126,13 @@ export default function BaseTable({
     );
   };
 
+  // Verifica se o botão de uma extraColumn deve aparecer para uma linha
+  const shouldShowButton = (extraCol, row) => {
+    if (!extraCol.showWhen) return true;
+    const { key, value } = extraCol.showWhen;
+    return row[key] === value;
+  };
+
   return (
     <div className="flex flex-col h-full gap-4" onClick={() => onRowSelect && onRowSelect(null)}>
       <div className="w-full flex justify-center" onClick={(e) => e.stopPropagation()}>
@@ -141,6 +169,16 @@ export default function BaseTable({
                   </th>
                 );
               })}
+
+              {/* Cabeçalhos das colunas extras */}
+              {extraColumns.map((extraCol, i) => (
+                <th
+                  key={`extra-header-${i}`}
+                  className="p-3 border-r border-blue-800 text-white font-semibold text-center"
+                >
+                  {extraCol.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -181,9 +219,29 @@ export default function BaseTable({
                       </div>
                     )}
                   </td>
+
                   {columns.map((col) => (
                     <td key={col} className="p-0 border-r border-white/5">
                       {renderCell(col, row, originalIndex)}
+                    </td>
+                  ))}
+
+                  {/* Células das colunas extras */}
+                  {extraColumns.map((extraCol, i) => (
+                    <td
+                      key={`extra-cell-${i}`}
+                      className="p-0 border-r border-white/5 text-center align-middle"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {shouldShowButton(extraCol, row) && showIcon && (
+                        <button
+                          style={{ backgroundColor: extraCol.buttonColor || "#2563eb" }}
+                          onClick={() => extraCol.onClick(row)}
+                          className="mx-auto my-1 px-3 py-1 rounded text-white text-xs font-semibold hover:opacity-80 active:opacity-60 transition-opacity"
+                        >
+                          {extraCol.buttonLabel}
+                        </button>
+                      )}
                     </td>
                   ))}
                 </tr>
