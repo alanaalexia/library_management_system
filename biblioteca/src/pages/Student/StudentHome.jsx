@@ -18,20 +18,21 @@ const StudentHome = ({ userProfile }) => {
       try {
         setLoading(true);
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log("user.id:", user?.id);
 
         if (!user) {
           console.error('Usuário não autenticado');
           return;
         }
 
-        const { data: cliente } = await supabase
+        const { data: cliente, error: erroCliente } = await supabase
           .from('cliente')
           .select('id_cliente')
           .eq('id_pessoa', user.id)
           .maybeSingle();
+
+        console.log("cliente:", cliente, "erroCliente:", erroCliente);
 
         if (!cliente) {
           console.error('Cliente não encontrado');
