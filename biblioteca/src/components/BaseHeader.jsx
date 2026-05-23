@@ -12,7 +12,7 @@ export default function BaseHeader({ navigationLinks = [], notificationCount = 0
       <div className="flex items-center gap-2 select-none flex-1">
         <img src="/guaxinim.svg" alt="Logo" className="w-8 h-8 object-contain" />
         <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent font-sans">
-          Biblioteca+
+          Bibliotheca+
         </span>
       </div>
 
