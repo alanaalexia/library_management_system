@@ -31,14 +31,14 @@ export default function BaseHeader({ navigationLinks = [], notificationCount = 0
 
       {/* Ações dinâmicas (Direita) */}
       <div className="flex items-center justify-end gap-5 flex-1">
-        <button className="relative text-slate-300 hover:text-white transition-colors" aria-label="Notificações">
+        {/* <button className="relative text-slate-300 hover:text-white transition-colors" aria-label="Notificações">
           <Bell size={22} />
           {notificationCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5">
               {notificationCount > 99 ? '99+' : notificationCount}
             </span>
           )}
-        </button>
+        </button> */}
 
         <button
           onClick={logout}
