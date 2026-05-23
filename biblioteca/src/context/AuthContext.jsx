@@ -18,8 +18,6 @@ export function AuthProvider({ children }) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // ── Busca perfil do banco (só para OAuth — cadastro manual é tratado
-    //    pelo login() em authService que já valida e retorna o profile) ──
     const fetchProfile = async (sessionUser) => {
       try {
         await syncOrCreateUser(sessionUser);
@@ -39,39 +37,60 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[Auth event]', event, 'session:', session);
-        console.debug('[Auth event]', event);
 
-        // SIGNED_UP: disparado pelo signUp() com autoconfirm desligado.
-        // Com autoconfirm LIGADO no Supabase, este evento NÃO existe —
-        // ele vira SIGNED_IN direto. Mas com autoconfirm DESLIGADO,
-        // o Supabase ainda faz login automático e dispara SIGNED_IN logo
-        // após o signUp quando não há confirmação de email.
-        //
-        // O problema: register() ainda está inserindo na tabela pessoa
-        // quando SIGNED_IN chega. A solução é: se o evento é SIGNED_IN
-        // mas o perfil não existe ainda na tabela pessoa, aguardamos
-        // um momento e tentamos novamente.
         if (event === 'SIGNED_IN' && session?.user) {
-          // Solta o callback imediatamente e processa depois
+          // Usamos o setTimeout para garantir que triggers ou chamadas paralelas terminem
           setTimeout(async () => {
             try {
+              // 1. Garante que o usuário existe/está sincronizado na tabela 'pessoa'
+              await syncOrCreateUser(session.user);
+
               let profile = null;
+              // Loop de retry caso a inserção do banco demore um milissegundo a mais
               for (let attempt = 0; attempt < 3; attempt++) {
-                console.log(`[SIGNED_IN] tentativa ${attempt + 1}`);
                 const { data } = await supabase
                   .from('pessoa')
                   .select('*')
                   .eq('id_pessoa', session.user.id)
                   .maybeSingle();
 
-                console.log('[SIGNED_IN] data:', data);
                 if (data) { profile = data; break; }
                 if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
               }
 
               if (profile) {
-                await syncOrCreateUser(session.user);
+                // 💡 REGRA DE VALIDAÇÃO PARA OAUTH (GOOGLE):
+                // Se não estiver ativo, desloga imediatamente e exibe o erro na tela de Login
+                if (profile.status !== 'Ativo') {
+                  await supabase.auth.signOut();
+                  setUser(null);
+                  setError('Seu cadastro está aguardando aprovação do bibliotecário.');
+                  return;
+                }
+
+                // Se for bibliotecário, verifica se já existe outro logado
+                if (profile.papel === 'bibliotecario') {
+                  const { data: bibLogado } = await supabase
+                    .from('bibliotecario')
+                    .select('id_pessoa')
+                    .eq('esta_logado', true)
+                    .neq('id_pessoa', profile.id_pessoa)
+                    .maybeSingle();
+
+                  if (bibLogado) {
+                    await supabase.auth.signOut();
+                    setUser(null);
+                    setError('Já existe um bibliotecário ativo no sistema. Aguarde o logout dele para entrar.');
+                    return;
+                  }
+
+                  // Se passou, marca como logado no banco
+                  await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
+                }
+
+                // Se passou em todas as regras, aceita o usuário no estado global
                 setUser({ ...session.user, ...profile });
+                setError(null);
               } else {
                 console.error('Perfil não encontrado após cadastro.');
                 setUser(null);
@@ -86,27 +105,33 @@ export function AuthProvider({ children }) {
           return;
         }
 
-          if (event === 'INITIAL_SESSION') {
-            setTimeout(async () => {
-              try {
-                if (session?.user) {
-                  const profile = await fetchProfile(session.user);
-                  setUser(profile ? { ...session.user, ...profile } : null);
+        if (event === 'INITIAL_SESSION') {
+          setTimeout(async () => {
+            try {
+              if (session?.user) {
+                const profile = await fetchProfile(session.user);
+                
+                // Valida o status também na sessão inicial (F5 na página)
+                if (profile && profile.status === 'Ativo') {
+                  setUser({ ...session.user, ...profile });
                 } else {
+                  if (session) await supabase.auth.signOut();
                   setUser(null);
                 }
-              } catch (err) {
-                console.error('Erro crítico no INITIAL_SESSION:', err);
+              } else {
                 setUser(null);
-              } finally {
-                setLoading(false);
               }
-            }, 0);
-            return;
-          }
+            } catch (err) {
+              console.error('Erro crítico no INITIAL_SESSION:', err);
+              setUser(null);
+            } finally {
+              setLoading(false);
+            }
+          }, 0);
+          return;
+        }
 
         if (event === 'TOKEN_REFRESHED') {
-          // Apenas atualiza o token, não rebusca perfil
           setLoading(false);
           return;
         }
@@ -117,7 +142,6 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        // Qualquer outro evento
         setLoading(false);
       }
     );
@@ -125,16 +149,12 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Fecha aba / recarrega página: marca bibliotecário como deslogado ──
   useEffect(() => {
     const handleUnload = () => {
       if (user?.papel === 'bibliotecario') {
-        // sendBeacon é síncrono e funciona mesmo durante unload
-        // Como não temos endpoint próprio, usamos a função diretamente
         marcarDeslogado(user.id_pessoa);
       }
     };
-
     window.addEventListener('beforeunload', handleUnload);
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [user]);
@@ -146,10 +166,7 @@ export function AuthProvider({ children }) {
     setError(null);
     setSuccess(false);
     try {
-      // O loginService valida o acesso e retorna o perfil estruturado
       const { profile, user: authUser } = await loginService(email, password);
-      
-      // Força a atualização imediata dos estados locais para evitar a condição de corrida
       setUser({ ...authUser, ...profile });
       setLoading(false);
     } catch (err) {
@@ -165,12 +182,6 @@ export function AuthProvider({ children }) {
     try {
       await registerService(userData);
       setSuccess(true);
-      // Com autoconfirm desligado + Supabase fazendo login automático,
-      // o onAuthStateChange (SIGNED_IN) vai disparar e tentar buscar
-      // o perfil com retry. Mas queremos mostrar a tela de sucesso,
-      // não ir para o dashboard. Por isso sinalizamos success=true
-      // e o Login.jsx exibe o feedback — o App.jsx só navega quando
-      // user?.papel estiver definido.
     } catch (err) {
       setError(err.message);
     } finally {
