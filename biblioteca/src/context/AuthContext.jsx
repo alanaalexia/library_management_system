@@ -85,7 +85,21 @@ export function AuthProvider({ children }) {
                   }
 
                   // Se passou, marca como logado no banco
-                  await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
+                  try {
+                    console.log('🔄 [SIGNED_IN] Marcando bibliotecário como logado:', profile.id_pessoa);
+                    const { data: updateData, error: updateError } = await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
+                    if (updateError) {
+                      console.error('❌ [SIGNED_IN] ERRO na atualização:', updateError);
+                      throw updateError;
+                    }
+                    console.log('✅ [SIGNED_IN] Bibliotecário marcado como logado:', profile.id_pessoa, 'Data:', updateData);
+                  } catch (updateErr) {
+                    console.error('❌ [SIGNED_IN] Erro ao marcar bibliotecário como logado:', updateErr);
+                    await supabase.auth.signOut();
+                    setUser(null);
+                    setError('Erro ao processar login do bibliotecário. Tente novamente.');
+                    return;
+                  }
                 }
 
                 // Se passou em todas as regras, aceita o usuário no estado global
@@ -113,6 +127,17 @@ export function AuthProvider({ children }) {
                 
                 // Valida o status também na sessão inicial (F5 na página)
                 if (profile && profile.status === 'Ativo') {
+                  // Se for bibliotecário, marca como logado no banco
+                  if (profile.papel === 'bibliotecario') {
+                    try {
+                      console.log('🔄 [INITIAL_SESSION] Marcando bibliotecário como logado:', profile.id_pessoa);
+                      const { data: updateData, error: updateError } = await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
+                      if (updateError) throw updateError;
+                      console.log('✅ [INITIAL_SESSION] Bibliotecário marcado como logado:', profile.id_pessoa, 'Data:', updateData);
+                    } catch (updateErr) {
+                      console.error('❌ [INITIAL_SESSION] Erro ao marcar bibliotecário como logado:', updateErr);
+                    }
+                  }
                   setUser({ ...session.user, ...profile });
                 } else {
                   if (session) await supabase.auth.signOut();
@@ -166,7 +191,14 @@ export function AuthProvider({ children }) {
     setError(null);
     setSuccess(false);
     try {
-      const { profile, user: authUser } = await loginService(email, password);
+      const result = await loginService(email, password);
+      console.log('🔍 resultado do loginService:', result); // <-- adiciona isso
+      const { profile, user: authUser } = result;
+      console.log('🔍 authUser:', authUser); // <-- e isso
+      console.log('🔍 profile:', profile);   // <-- e isso
+      
+      //const { profile, user: authUser } = await loginService(email, password);
+      
       setUser({ ...authUser, ...profile });
       setLoading(false);
     } catch (err) {
@@ -205,6 +237,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       await logoutService(user?.id_pessoa, user?.papel);
+      setLoading(false);
     } catch (err) {
       setError(err.message);
       setLoading(false);

@@ -50,11 +50,22 @@ const validarAcesso = async (profile) => {
  * Marca esta_logado = true para bibliotecários.
  */
 const marcarLogado = async (userId) => {
-  const { error } = await supabase
+  console.log('🔄 Tentando marcar bibliotecário como logado:', userId);
+  
+  const { data, error } = await supabase
     .from('bibliotecario')
     .update({ esta_logado: true })
     .eq('id_pessoa', userId);
-  if (error) throw error;
+  
+  if (error) {
+    console.error('❌ ERRO ao marcar bibliotecário como logado:', error);
+    console.error('   Código:', error.code);
+    console.error('   Mensagem:', error.message);
+    console.error('   Details:', error.details);
+    throw error;
+  }
+  
+  console.log('✅ Bibliotecário marcado como logado:', userId, 'Data:', data);
 };
 
 /**
@@ -64,10 +75,12 @@ const marcarLogado = async (userId) => {
  */
 export const marcarDeslogado = async (userId) => {
   try {
-    await supabase
+    const { error } = await supabase
       .from('bibliotecario')
       .update({ esta_logado: false })
       .eq('id_pessoa', userId);
+    if (error) throw error;
+    console.log('Bibliotecário marcado como deslogado:', userId);
   } catch (err) {
     console.warn('Erro ao marcar bibliotecário como deslogado:', err.message);
   }
@@ -180,7 +193,11 @@ export const logout = async (userId, papel) => {
     await marcarDeslogado(userId);
   }
   const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  if (error) {
+    console.error('Erro ao fazer logout:', error);
+    throw error;
+  }
+  console.log('Logout realizado com sucesso');
 };
 
 export const signInWithGoogle = async () => {
