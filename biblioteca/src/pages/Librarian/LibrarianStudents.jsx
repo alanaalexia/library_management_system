@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { enviarEmail } from "../../services/emailService";
 import BaseTable from "../../components/BaseTable";
 import { Botao } from "../../components/Botoes";
 import LibrarianHeader from "./LibrarianHeader";
@@ -21,6 +22,7 @@ const COMBOBOX = {
 
 export default function LibrarianStudents() {
   const [dados, setDados] = useState([]);
+  const [dadosOriginais, setDadosOriginais] = useState([]);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
@@ -42,7 +44,9 @@ export default function LibrarianStudents() {
         .eq("papel", "cliente")
         .order("nome", { ascending: true });
       if (error) throw error;
-      setDados([...(data || []), criarLinhaVazia()]);
+      const linhas = [...(data || []), criarLinhaVazia()];
+      setDados(linhas);
+      setDadosOriginais(data || []); // salva snapshot para comparação ao salvar
     } catch {
       setMsg({ tipo: "erro", texto: "Não foi possível carregar os estudantes." });
     } finally {
@@ -113,7 +117,7 @@ export default function LibrarianStudents() {
           status: resto.status || "Pendente",
         }));
 
-      // Atualizar existentes
+      // Atualizar existentes + disparar email se status mudou para Ativo
       for (const linha of linhasExistentes) {
         const { id_pessoa, criado_em, atualizado_em, ...campos } = linha;
         const { error } = await supabase
@@ -121,9 +125,22 @@ export default function LibrarianStudents() {
           .update(campos)
           .eq("id_pessoa", id_pessoa);
         if (error) throw error;
+
+        // Verifica se esse usuário tinha status diferente de Ativo antes de salvar
+        const original = dadosOriginais.find(d => d.id_pessoa === id_pessoa);
+        const foiAtivadoAgora = original?.status !== 'Ativo' && campos.status === 'Ativo';
+
+        if (foiAtivadoAgora) {
+          try {
+            await enviarEmail('cadastro_aprovado', linha.email, { nome: linha.nome });
+          } catch (emailErr) {
+            // Não bloqueia o salvamento se o email falhar — só loga
+            console.warn(`[LibrarianStudents] Falha ao enviar email para ${linha.email}:`, emailErr.message);
+          }
+        }
       }
 
-      // Inserir novos — nota: não cria auth.user, só insere na tabela pessoa
+      // Inserir novos
       if (linhasNovas.length > 0) {
         const { error } = await supabase.from("pessoa").insert(linhasNovas);
         if (error) throw error;
