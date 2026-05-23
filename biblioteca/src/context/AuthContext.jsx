@@ -39,14 +39,11 @@ export function AuthProvider({ children }) {
         console.log('[Auth event]', event, 'session:', session);
 
         if (event === 'SIGNED_IN' && session?.user) {
-          // Usamos o setTimeout para garantir que triggers ou chamadas paralelas terminem
           setTimeout(async () => {
             try {
-              // 1. Garante que o usuário existe/está sincronizado na tabela 'pessoa'
               await syncOrCreateUser(session.user);
 
               let profile = null;
-              // Loop de retry caso a inserção do banco demore um milissegundo a mais
               for (let attempt = 0; attempt < 3; attempt++) {
                 const { data } = await supabase
                   .from('pessoa')
@@ -59,16 +56,19 @@ export function AuthProvider({ children }) {
               }
 
               if (profile) {
-                // 💡 REGRA DE VALIDAÇÃO PARA OAUTH (GOOGLE):
-                // Se não estiver ativo, desloga imediatamente e exibe o erro na tela de Login
                 if (profile.status !== 'Ativo') {
                   await supabase.auth.signOut();
                   setUser(null);
-                  setError('Seu cadastro está aguardando aprovação do bibliotecário.');
+                  const mensagens = {
+                    'Pendente':  'Seu cadastro está aguardando aprovação do bibliotecário.',
+                    'Rejeitado': 'Seu cadastro foi rejeitado pelo bibliotecário. Entre em contato para mais informações.',
+                    'Suspenso':  'Sua conta está suspensa. Entre em contato com um bibliotecário.',
+                    'Banido':    'Sua conta foi banida por 30 dias devido à não devolução de livros dentro do prazo.',
+                  };
+                  setError(mensagens[profile.status] ?? 'Acesso não autorizado. Entre em contato com o bibliotecário.');
                   return;
                 }
 
-                // Se for bibliotecário, verifica se já existe outro logado
                 if (profile.papel === 'bibliotecario') {
                   const { data: bibLogado } = await supabase
                     .from('bibliotecario')
@@ -84,17 +84,13 @@ export function AuthProvider({ children }) {
                     return;
                   }
 
-                  // Se passou, marca como logado no banco
-                  try {
-                    console.log('🔄 [SIGNED_IN] Marcando bibliotecário como logado:', profile.id_pessoa);
-                    const { data: updateData, error: updateError } = await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
-                    if (updateError) {
-                      console.error('❌ [SIGNED_IN] ERRO na atualização:', updateError);
-                      throw updateError;
-                    }
-                    console.log('✅ [SIGNED_IN] Bibliotecário marcado como logado:', profile.id_pessoa, 'Data:', updateData);
-                  } catch (updateErr) {
-                    console.error('❌ [SIGNED_IN] Erro ao marcar bibliotecário como logado:', updateErr);
+                  const { error: updateError } = await supabase
+                    .from('bibliotecario')
+                    .update({ esta_logado: true })
+                    .eq('id_pessoa', profile.id_pessoa);
+
+                  if (updateError) {
+                    console.error('❌ [SIGNED_IN] ERRO na atualização:', updateError);
                     await supabase.auth.signOut();
                     setUser(null);
                     setError('Erro ao processar login do bibliotecário. Tente novamente.');
@@ -102,7 +98,6 @@ export function AuthProvider({ children }) {
                   }
                 }
 
-                // Se passou em todas as regras, aceita o usuário no estado global
                 setUser({ ...session.user, ...profile });
                 setError(null);
               } else {
@@ -124,18 +119,17 @@ export function AuthProvider({ children }) {
             try {
               if (session?.user) {
                 const profile = await fetchProfile(session.user);
-                
-                // Valida o status também na sessão inicial (F5 na página)
+
+                // FIX: comparação com 'Ativo' (capital) — correto conforme schema
                 if (profile && profile.status === 'Ativo') {
-                  // Se for bibliotecário, marca como logado no banco
                   if (profile.papel === 'bibliotecario') {
-                    try {
-                      console.log('🔄 [INITIAL_SESSION] Marcando bibliotecário como logado:', profile.id_pessoa);
-                      const { data: updateData, error: updateError } = await supabase.from('bibliotecario').update({ esta_logado: true }).eq('id_pessoa', profile.id_pessoa);
-                      if (updateError) throw updateError;
-                      console.log('✅ [INITIAL_SESSION] Bibliotecário marcado como logado:', profile.id_pessoa, 'Data:', updateData);
-                    } catch (updateErr) {
-                      console.error('❌ [INITIAL_SESSION] Erro ao marcar bibliotecário como logado:', updateErr);
+                    const { error: updateError } = await supabase
+                      .from('bibliotecario')
+                      .update({ esta_logado: true })
+                      .eq('id_pessoa', profile.id_pessoa);
+
+                    if (updateError) {
+                      console.error('❌ [INITIAL_SESSION] Erro ao marcar bibliotecário:', updateError);
                     }
                   }
                   setUser({ ...session.user, ...profile });
@@ -191,18 +185,12 @@ export function AuthProvider({ children }) {
     setError(null);
     setSuccess(false);
     try {
-      const result = await loginService(email, password);
-      console.log('🔍 resultado do loginService:', result); // <-- adiciona isso
-      const { profile, user: authUser } = result;
-      console.log('🔍 authUser:', authUser); // <-- e isso
-      console.log('🔍 profile:', profile);   // <-- e isso
-      
-      //const { profile, user: authUser } = await loginService(email, password);
-      
+      // FIX: authService.login agora retorna { user, session, profile } explicitamente
+      const { user: authUser, profile } = await loginService(email, password);
       setUser({ ...authUser, ...profile });
-      setLoading(false);
     } catch (err) {
       setError(err.message);
+    } finally {
       setLoading(false);
     }
   };
@@ -237,9 +225,9 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       await logoutService(user?.id_pessoa, user?.papel);
-      setLoading(false);
     } catch (err) {
       setError(err.message);
+    } finally {
       setLoading(false);
     }
   };

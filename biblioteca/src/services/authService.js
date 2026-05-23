@@ -26,16 +26,21 @@ const validarAcesso = async (profile) => {
   }
 
   if (profile.status !== 'Ativo') {
-    throw new Error('Seu cadastro está aguardando aprovação do bibliotecário.');
+    const mensagens = {
+      'Pendente':  'Seu cadastro está aguardando aprovação do bibliotecário.',
+      'Rejeitado': 'Seu cadastro foi rejeitado pelo bibliotecário. Entre em contato para mais informações.',
+      'Suspenso':  'Sua conta está suspensa. Entre em contato com um bibliotecário.',
+      'Banido':    'Sua conta foi banida por 30 dias devido à não devolução de livros dentro do prazo.',
+    };
+    throw new Error(mensagens[profile.status] ?? 'Acesso não autorizado. Entre em contato com o bibliotecário.');
   }
 
   if (profile.papel === 'bibliotecario') {
-    // Verifica se outro bibliotecário já está logado
     const { data, error } = await supabase
       .from('bibliotecario')
       .select('id_pessoa')
       .eq('esta_logado', true)
-      .neq('id_pessoa', profile.id_pessoa) // ignora o próprio usuário
+      .neq('id_pessoa', profile.id_pessoa)
       .maybeSingle();
 
     if (error) throw error;
@@ -50,22 +55,19 @@ const validarAcesso = async (profile) => {
  * Marca esta_logado = true para bibliotecários.
  */
 const marcarLogado = async (userId) => {
-  console.log('🔄 Tentando marcar bibliotecário como logado:', userId);
-  
-  const { data, error } = await supabase
+  console.log('🔄 Marcando bibliotecário como logado:', userId);
+
+  const { error } = await supabase
     .from('bibliotecario')
     .update({ esta_logado: true })
     .eq('id_pessoa', userId);
-  
+
   if (error) {
     console.error('❌ ERRO ao marcar bibliotecário como logado:', error);
-    console.error('   Código:', error.code);
-    console.error('   Mensagem:', error.message);
-    console.error('   Details:', error.details);
     throw error;
   }
-  
-  console.log('✅ Bibliotecário marcado como logado:', userId, 'Data:', data);
+
+  console.log('✅ Bibliotecário marcado como logado:', userId);
 };
 
 /**
@@ -80,9 +82,9 @@ export const marcarDeslogado = async (userId) => {
       .update({ esta_logado: false })
       .eq('id_pessoa', userId);
     if (error) throw error;
-    console.log('Bibliotecário marcado como deslogado:', userId);
+    console.log('✅ Bibliotecário marcado como deslogado:', userId);
   } catch (err) {
-    console.warn('Erro ao marcar bibliotecário como deslogado:', err.message);
+    console.warn('⚠️ Erro ao marcar bibliotecário como deslogado:', err.message);
   }
 };
 
@@ -167,6 +169,9 @@ export const register = async (userData) => {
  * Login com email/senha.
  * Valida status e regra de bibliotecário único ANTES de deixar entrar.
  * Se a validação falhar, faz logout imediato para não deixar sessão aberta.
+ *
+ * FIX: retorna { user, session, profile } explicitamente para o AuthContext
+ * conseguir desestruturar corretamente.
  */
 export const login = async (email, password) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -180,9 +185,13 @@ export const login = async (email, password) => {
       await marcarLogado(data.user.id);
     }
 
-    return { ...data, profile };
+    // FIX: retorno explícito com user, session e profile separados
+    return {
+      user: data.user,
+      session: data.session,
+      profile,
+    };
   } catch (validationError) {
-    // Validade falhou: desfaz a sessão antes de propagar o erro
     await supabase.auth.signOut();
     throw validationError;
   }
@@ -197,7 +206,7 @@ export const logout = async (userId, papel) => {
     console.error('Erro ao fazer logout:', error);
     throw error;
   }
-  console.log('Logout realizado com sucesso');
+  console.log('✅ Logout realizado com sucesso');
 };
 
 export const signInWithGoogle = async () => {

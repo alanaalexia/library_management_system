@@ -14,7 +14,7 @@ const LABELS = {
 
 const COMBOBOX = {
   status: {
-    options: ["Pendente", "Ativo", "Rejeitado", "Suspenso"],
+    options: ["Pendente", "Ativo", "Rejeitado", "Suspenso", "Banido"],
     default: "Pendente",
   },
 };
