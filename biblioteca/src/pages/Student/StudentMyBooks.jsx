@@ -3,31 +3,47 @@ import { supabase } from "../../services/supabaseClient";
 import { useAuth } from "../../hooks/useAuth";
 import StudentHeader from "./StudentHeader";
 import BaseTable from "../../components/BaseTable";
+import ReenviarQRCode from "../../components/ReenviarQRCode";
 
 const COLUNAS = ["isbn", "titulo", "autor", "editora", "idioma", "tipo", "status", "prazo"];
 const LABELS = {
-  isbn:     "ISBN",
-  titulo:   "Título",
-  autor:    "Autor",
-  editora:  "Editora",
-  idioma:   "Idioma",
-  tipo:     "Tipo",
-  status:   "Status",
-  prazo:    "Prazo",
+  isbn:    "ISBN",
+  titulo:  "Título",
+  autor:   "Autor",
+  editora: "Editora",
+  idioma:  "Idioma",
+  tipo:    "Tipo",
+  status:  "Status",
+  prazo:   "Prazo",
 };
+
+/**
+ * Converte "YYYY-MM-DD" para "DD/MM/YYYY" sem conversão UTC.
+ * Evita o desvio de fuso que faz new Date("2026-05-28") virar 27/05 no Brasil.
+ */
+function formatarData(dataStr) {
+  if (!dataStr) return "—";
+  const [ano, mes, dia] = dataStr.split("-");
+  return `${dia}/${mes}/${ano}`;
+}
 
 export default function StudentMyBooks() {
   const { user } = useAuth();
-  const [dados, setDados]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [msg, setMsg]         = useState({ tipo: "", texto: "" });
+  const [dados, setDados]         = useState([]);
+  const [reservas, setReservas]   = useState([]); // mantém objetos completos para ações
+  const [clienteId, setClienteId] = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [msg, setMsg]             = useState({ tipo: "", texto: "" });
+
+  // Modal de cancelamento
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(null); // reserva obj
+  const [cancelando, setCancelando]                   = useState(false);
 
   const carregarMeusLivros = useCallback(async () => {
     if (!user?.id_pessoa) return;
     setLoading(true);
     setMsg({ tipo: "", texto: "" });
     try {
-      // Busca id_cliente
       const { data: clienteData, error: erroCliente } = await supabase
         .from("cliente")
         .select("id_cliente")
@@ -40,51 +56,47 @@ export default function StudentMyBooks() {
         return;
       }
 
-      const clienteId = clienteData.id_cliente;
+      const id = clienteData.id_cliente;
+      setClienteId(id);
 
-      // Busca reservas ativas do cliente
-      const { data: reservas, error: erroReservas } = await supabase
-        .from("reserva")
-        .select(`
-          id_reserva,
-          status,
-          prazo_validade,
-          livro (isbn, titulo, autor, editora, idioma)
-        `)
-        .eq("id_cliente", clienteId)
-        .eq("status", "ativa");
+      const [
+        { data: reservasData, error: erroReservas },
+        { data: emprestimosData, error: erroEmprestimos },
+      ] = await Promise.all([
+        supabase
+          .from("reserva")
+          .select("id_reserva, id_livro, status, prazo_validade, livro(isbn, titulo, autor, editora, idioma)")
+          .eq("id_cliente", id)
+          .eq("status", "ativa"),
+        supabase
+          .from("emprestimo")
+          .select("id_emprestimo, status, prazo_devolucao, livro(isbn, titulo, autor, editora, idioma)")
+          .eq("id_cliente", id)
+          .eq("status", "ativo"),
+      ]);
 
-      if (erroReservas) throw erroReservas;
-
-      // Busca empréstimos ativos do cliente
-      const { data: emprestimos, error: erroEmprestimos } = await supabase
-        .from("emprestimo")
-        .select(`
-          id_emprestimo,
-          status,
-          prazo_devolucao,
-          livro (isbn, titulo, autor, editora, idioma)
-        `)
-        .eq("id_cliente", clienteId)
-        .eq("status", "ativo");
-
+      if (erroReservas)    throw erroReservas;
       if (erroEmprestimos) throw erroEmprestimos;
 
-      // Monta linhas da tabela
-      const linhasReservas = (reservas || []).map(r => ({
-        isbn:    r.livro?.isbn    ?? "",
-        titulo:  r.livro?.titulo  ?? "",
-        autor:   r.livro?.autor   ?? "",
-        editora: r.livro?.editora ?? "",
-        idioma:  r.livro?.idioma  ?? "",
-        tipo:    "Reserva",
-        status:  "Reservado",
-        prazo:   r.prazo_validade
-          ? new Date(r.prazo_validade).toLocaleDateString("pt-BR")
-          : "—",
+      setReservas(reservasData || []);
+
+      const linhasReservas = (reservasData || []).map(r => ({
+        _id_reserva: r.id_reserva,
+        _id_livro:   r.id_livro,
+        _tipo:       "reserva",
+        isbn:        r.livro?.isbn    ?? "",
+        titulo:      r.livro?.titulo  ?? "",
+        autor:       r.livro?.autor   ?? "",
+        editora:     r.livro?.editora ?? "",
+        idioma:      r.livro?.idioma  ?? "",
+        tipo:        "Reserva",
+        status:      "Reservado",
+        prazo:       formatarData(r.prazo_validade),
+        _prazo_raw:  r.prazo_validade,
       }));
 
-      const linhasEmprestimos = (emprestimos || []).map(e => ({
+      const linhasEmprestimos = (emprestimosData || []).map(e => ({
+        _tipo:   "emprestimo",
         isbn:    e.livro?.isbn    ?? "",
         titulo:  e.livro?.titulo  ?? "",
         autor:   e.livro?.autor   ?? "",
@@ -92,9 +104,7 @@ export default function StudentMyBooks() {
         idioma:  e.livro?.idioma  ?? "",
         tipo:    "Empréstimo",
         status:  "Emprestado",
-        prazo:   e.prazo_devolucao
-          ? new Date(e.prazo_devolucao).toLocaleDateString("pt-BR")
-          : "—",
+        prazo:   formatarData(e.prazo_devolucao),
       }));
 
       setDados([...linhasEmprestimos, ...linhasReservas]);
@@ -107,6 +117,39 @@ export default function StudentMyBooks() {
   }, [user?.id_pessoa]);
 
   useEffect(() => { carregarMeusLivros(); }, [carregarMeusLivros]);
+
+  // ─── Cancelar reserva ──────────────────────────────────────────────────────
+
+  async function handleCancelarReserva() {
+    if (!confirmandoCancelar) return;
+    setCancelando(true);
+    try {
+      const { error: erroCancelar } = await supabase
+        .from("reserva")
+        .update({ status: "cancelada" })
+        .eq("id_reserva", confirmandoCancelar.id_reserva);
+
+      if (erroCancelar) throw erroCancelar;
+
+      const { error: erroLivro } = await supabase
+        .from("livro")
+        .update({ status: "Disponível", atualizado_em: new Date().toISOString() })
+        .eq("id_livro", confirmandoCancelar.id_livro);
+
+      if (erroLivro) throw erroLivro;
+
+      setConfirmandoCancelar(null);
+      setMsg({ tipo: "sucesso", texto: "Reserva cancelada com sucesso." });
+      await carregarMeusLivros();
+    } catch (err) {
+      console.error("Erro ao cancelar reserva:", err);
+      setMsg({ tipo: "erro", texto: "Não foi possível cancelar a reserva." });
+    } finally {
+      setCancelando(false);
+    }
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-screen flex flex-col bg-slate-950 text-white w-full">
@@ -132,18 +175,90 @@ export default function StudentMyBooks() {
             <p className="text-slate-400 text-sm">Você não possui reservas ou empréstimos ativos.</p>
           </div>
         ) : (
-          <BaseTable
-            data={dados}
-            columns={COLUNAS}
-            onCellChange={() => {}}
-            isReadOnly={true}
-            selectedRowIndex={null}
-            onRowSelect={() => {}}
-            columnLabels={LABELS}
-            allowNewRow={false}
-          />
+          <div className="flex-1 overflow-auto">
+            <BaseTable
+              data={dados}
+              columns={COLUNAS}
+              onCellChange={() => {}}
+              isReadOnly={true}
+              selectedRowIndex={null}
+              onRowSelect={() => {}}
+              columnLabels={LABELS}
+              allowNewRow={false}
+            />
+
+            {/* Ações por reserva */}
+            <div className="mt-6 flex flex-col gap-3">
+              {dados
+                .filter(row => row._tipo === "reserva")
+                .map(row => (
+                  <div
+                    key={row._id_reserva}
+                    className="flex items-center justify-between bg-slate-900 border border-slate-700 rounded-lg px-4 py-3"
+                  >
+                    <span className="text-slate-300 text-sm font-medium truncate max-w-[50%]">
+                      {row.titulo}
+                    </span>
+                    <div className="flex items-center gap-4">
+                      {clienteId && (
+                        <ReenviarQRCode
+                          reserva={{
+                            id_reserva:    row._id_reserva,
+                            id_livro:      row._id_livro,
+                            prazo_validade: row._prazo_raw,
+                          }}
+                          clienteId={clienteId}
+                        />
+                      )}
+                      <button
+                        onClick={() =>
+                          setConfirmandoCancelar({
+                            id_reserva: row._id_reserva,
+                            id_livro:   row._id_livro,
+                            titulo:     row.titulo,
+                          })
+                        }
+                        className="text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        🗑 Cancelar reserva
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
         )}
       </div>
+
+      {/* Modal de confirmação de cancelamento */}
+      {confirmandoCancelar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-white font-semibold text-lg mb-2">Cancelar reserva</h3>
+            <p className="text-slate-400 text-sm mb-6">
+              Tem certeza que deseja cancelar a reserva de{" "}
+              <span className="text-white font-medium">{confirmandoCancelar.titulo}</span>?
+              O livro voltará a ficar disponível para outros leitores.
+            </p>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 py-2 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                onClick={() => setConfirmandoCancelar(null)}
+                disabled={cancelando}
+              >
+                Voltar
+              </button>
+              <button
+                className="flex-1 py-2 px-4 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                onClick={handleCancelarReserva}
+                disabled={cancelando}
+              >
+                {cancelando ? "Cancelando…" : "Confirmar cancelamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

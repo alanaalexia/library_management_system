@@ -194,7 +194,7 @@ export default function BooksManagement({ mode }) {
   const handleReservaConfirmada = async () => {
     setModalReserva(false);
     setSelectedRowIndex(null);
-    setMsg({ tipo: "sucesso", texto: "Livro reservado com sucesso!" });
+    setMsg({ tipo: "sucesso", texto: "Livro reservado com sucesso! QRcode enviado para seu email." });
     await carregarLivros();
   };
 

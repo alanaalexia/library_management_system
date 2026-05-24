@@ -9,24 +9,31 @@ import { enviarQRCode } from '../services/qrcodeService';
  *  - livro      {object}   objeto do livro selecionado (id_livro, titulo, autor, isbn, status)
  *  - clienteId  {string}   id_cliente do estudante logado
  *  - onClose    {function} fecha o modal
- *  - onSuccess  {function} callback chamado após reserva bem-sucedida (ex: atualizar lista)
+ *  - onSuccess  {function} callback chamado após reserva bem-sucedida
  */
 export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro]       = useState(null);
-  const [sucesso, setSucesso] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [erro, setErro]             = useState(null);
+  const [sucesso, setSucesso]       = useState(false);
+  const [emailEnviado, setEmailEnviado] = useState(false);
+  const [emailErro, setEmailErro]   = useState(false);
 
-  // Prazo de validade da reserva: 5 dias a partir de hoje
+  /**
+   * Monta YYYY-MM-DD usando a data LOCAL do usuário (sem conversão UTC).
+   * Evita desvio de fuso (ex: Brasília UTC-3 virava um dia antes).
+   */
   function calcularPrazoValidade() {
     const data = new Date();
     data.setDate(data.getDate() + 5);
-    return data.toISOString().split('T')[0]; // YYYY-MM-DD
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
   }
 
   async function handleReservar() {
     setErro(null);
 
-    // 1. Guarda de status — proteção extra além do frontend
     if (livro.status !== 'Disponível') {
       setErro(
         livro.status === 'Reservado'
@@ -39,7 +46,7 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      // 2. Verifica se o cliente já tem reserva ativa para este livro
+      // 1. Verifica reserva duplicada
       const { data: reservaExistente, error: erroVerificacao } = await supabase
         .from('reserva')
         .select('id_reserva')
@@ -49,20 +56,30 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         .maybeSingle();
 
       if (erroVerificacao) throw erroVerificacao;
-
       if (reservaExistente) {
         setErro('Você já possui uma reserva ativa para este livro.');
         return;
       }
 
-      // 3. Verifica se o cliente está suspenso ou banido + busca dados para o email
-      const { data: clienteData, error: erroCliente } = await supabase
-        .from('cliente')
-        .select('esta_banido, data_suspensao, pessoa(nome, email, status)')
-        .eq('id_cliente', clienteId)
-        .single();
+      // 2. Elegibilidade + contagem de reservas (em paralelo)
+      const [
+        { data: clienteData, error: erroCliente },
+        { count: totalReservas, error: erroContagem },
+      ] = await Promise.all([
+        supabase
+          .from('cliente')
+          .select('esta_banido, data_suspensao, pessoa(nome, email, status)')
+          .eq('id_cliente', clienteId)
+          .single(),
+        supabase
+          .from('reserva')
+          .select('*', { count: 'exact', head: true })
+          .eq('id_cliente', clienteId)
+          .in('status', ['pendente', 'ativa']),
+      ]);
 
-      if (erroCliente) throw erroCliente;
+      if (erroCliente)  throw erroCliente;
+      if (erroContagem) throw erroContagem;
 
       if (clienteData.esta_banido) {
         setErro('Sua conta está banida. Entre em contato com a biblioteca.');
@@ -74,15 +91,19 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
         if (suspensao >= hoje) {
-          const dataFormatada = suspensao.toLocaleDateString('pt-BR');
-          setErro(`Sua conta está suspensa até ${dataFormatada}. Não é possível realizar reservas.`);
+          setErro(`Sua conta está suspensa até ${suspensao.toLocaleDateString('pt-BR')}. Não é possível realizar reservas.`);
           return;
         }
       }
 
+      if (totalReservas >= 2) {
+        setErro('Você já possui 2 reservas ativas. Devolva ou aguarde o vencimento de uma antes de reservar outro livro.');
+        return;
+      }
+
       const prazo_validade = calcularPrazoValidade();
 
-      // 4. Cria a reserva com status 'ativa'
+      // 3. Cria a reserva
       const { data: novaReserva, error: erroReserva } = await supabase
         .from('reserva')
         .insert({
@@ -96,7 +117,7 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
 
       if (erroReserva) throw erroReserva;
 
-      // 5. Atualiza o status do livro para 'Reservado'
+      // 4. Atualiza livro para 'Reservado'
       const { error: erroLivro } = await supabase
         .from('livro')
         .update({ status: 'Reservado', atualizado_em: new Date().toISOString() })
@@ -104,8 +125,12 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
 
       if (erroLivro) throw erroLivro;
 
-      // 6. Gera e envia o QR code por email
-      await enviarQRCode({
+      // 5. Mostra sucesso imediatamente — email é disparado em paralelo
+      setSucesso(true);
+      onSuccess?.();
+
+      // 6. Envia QR code — falha não bloqueia o fluxo, mas atualiza o estado do email
+      enviarQRCode({
         id_cliente:    clienteId,
         id_reserva:    novaReserva.id_reserva,
         email:         clienteData.pessoa.email,
@@ -113,11 +138,12 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         titulo:        livro.titulo,
         isbn:          livro.isbn,
         prazo_validade,
-      });
-
-      // 7. Sucesso
-      setSucesso(true);
-      onSuccess?.();
+      })
+        .then(() => setEmailEnviado(true))
+        .catch((err) => {
+          console.error('[ReserveBook] Falha ao enviar QR code:', err);
+          setEmailErro(true);
+        });
 
     } catch (err) {
       console.error('Erro ao reservar livro:', err);
@@ -127,19 +153,46 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
     }
   }
 
-  // ─── UI ────────────────────────────────────────────────────────────────────
+  // ─── Tela de sucesso ───────────────────────────────────────────────────────
 
   if (sucesso) {
     return (
       <div className="reserve-book">
         <div className="text-center py-4">
-          <div className="text-green-400 text-4xl mb-3">✓</div>
+          <div className="text-green-400 text-5xl mb-4">✓</div>
           <h3 className="text-white font-semibold text-lg mb-2">Reserva confirmada!</h3>
-          <p className="text-slate-400 text-sm mb-6">
-            Sua reserva de <span className="text-white font-medium">{livro.titulo}</span> foi
-            realizada. Enviamos um <span className="text-green-400 font-medium">QR code</span> para
-            o seu email — apresente-o na biblioteca para retirar o livro.
+          <p className="text-slate-400 text-sm mb-4">
+            <span className="text-white font-medium">{livro.titulo}</span> foi reservado com sucesso.
           </p>
+
+          {/* Status do envio do QR code */}
+          {!emailEnviado && !emailErro && (
+            <div className="bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 mb-6 text-left">
+              <p className="text-slate-400 text-sm flex items-center gap-2">
+                <span className="inline-block w-3 h-3 border border-slate-400 border-t-transparent rounded-full animate-spin" />
+                Enviando QR code para o seu email…
+              </p>
+            </div>
+          )}
+
+          {emailEnviado && (
+            <div className="bg-slate-800 border border-green-500/40 rounded-lg px-4 py-3 mb-6 text-left">
+              <p className="text-green-400 text-sm font-medium mb-1">📩 QR code enviado!</p>
+              <p className="text-slate-400 text-xs">
+                Verifique sua caixa de entrada e apresente o QR code na biblioteca para retirar o livro.
+              </p>
+            </div>
+          )}
+
+          {emailErro && (
+            <div className="bg-slate-800 border border-yellow-500/40 rounded-lg px-4 py-3 mb-6 text-left">
+              <p className="text-yellow-400 text-sm font-medium mb-1">⚠️ Falha ao enviar o QR code</p>
+              <p className="text-slate-400 text-xs">
+                Sua reserva foi criada, mas o email não foi enviado. Use "Reenviar QR code" na tela Meus Livros.
+              </p>
+            </div>
+          )}
+
           <button
             className="w-full py-2 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors"
             onClick={onClose}
@@ -151,9 +204,10 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
     );
   }
 
+  // ─── Formulário de reserva ─────────────────────────────────────────────────
+
   return (
     <div className="reserve-book">
-      {/* Cabeçalho */}
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-white font-semibold text-lg">Reservar livro</h3>
         <button
@@ -165,7 +219,6 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         </button>
       </div>
 
-      {/* Info do livro */}
       <div className="bg-slate-800 rounded-lg p-4 mb-5">
         <p className="text-white font-medium">{livro.titulo}</p>
         <p className="text-slate-400 text-sm mt-1">{livro.autor}</p>
@@ -180,14 +233,12 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         </span>
       </div>
 
-      {/* Aviso validade */}
       {livro.status === 'Disponível' && (
         <p className="text-slate-400 text-xs mb-4">
           📅 Após a reserva você receberá um QR code por email válido por <strong className="text-white">5 dias</strong>.
         </p>
       )}
 
-      {/* Aviso se indisponível */}
       {livro.status !== 'Disponível' && (
         <p className="text-yellow-400 text-sm mb-4">
           ⚠️ {livro.status === 'Reservado'
@@ -196,14 +247,12 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         </p>
       )}
 
-      {/* Erro */}
       {erro && (
         <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 mb-4">
           ⚠️ {erro}
         </p>
       )}
 
-      {/* Ações */}
       <div className="flex gap-3">
         <button
           className="flex-1 py-2 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
