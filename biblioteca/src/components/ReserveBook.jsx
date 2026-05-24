@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { enviarQRCode } from '../services/qrcodeService';
 
 /**
  * ReserveBook
  *
  * Props:
- *  - livro      {object}   objeto do livro selecionado (id_livro, titulo, autor, status)
+ *  - livro      {object}   objeto do livro selecionado (id_livro, titulo, autor, isbn, status)
  *  - clienteId  {string}   id_cliente do estudante logado
  *  - onClose    {function} fecha o modal
  *  - onSuccess  {function} callback chamado após reserva bem-sucedida (ex: atualizar lista)
@@ -15,10 +16,10 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
   const [erro, setErro]       = useState(null);
   const [sucesso, setSucesso] = useState(false);
 
-  // Prazo de validade da reserva: 3 dias a partir de hoje
+  // Prazo de validade da reserva: 5 dias a partir de hoje
   function calcularPrazoValidade() {
     const data = new Date();
-    data.setDate(data.getDate() + 3);
+    data.setDate(data.getDate() + 5);
     return data.toISOString().split('T')[0]; // YYYY-MM-DD
   }
 
@@ -54,10 +55,10 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         return;
       }
 
-      // 3. Verifica se o cliente está suspenso ou banido
+      // 3. Verifica se o cliente está suspenso ou banido + busca dados para o email
       const { data: clienteData, error: erroCliente } = await supabase
         .from('cliente')
-        .select('esta_banido, data_suspensao, pessoa(status)')
+        .select('esta_banido, data_suspensao, pessoa(nome, email, status)')
         .eq('id_cliente', clienteId)
         .single();
 
@@ -79,15 +80,19 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         }
       }
 
-      // 4. Cria a reserva com status 'pendente' (aguarda aprovação do bibliotecário)
-      const { error: erroReserva } = await supabase
+      const prazo_validade = calcularPrazoValidade();
+
+      // 4. Cria a reserva com status 'ativa'
+      const { data: novaReserva, error: erroReserva } = await supabase
         .from('reserva')
         .insert({
           id_cliente:     clienteId,
           id_livro:       livro.id_livro,
-          prazo_validade: calcularPrazoValidade(),
+          prazo_validade,
           status:         'ativa',
-        });
+        })
+        .select('id_reserva')
+        .single();
 
       if (erroReserva) throw erroReserva;
 
@@ -99,7 +104,18 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
 
       if (erroLivro) throw erroLivro;
 
-      // 6. Sucesso
+      // 6. Gera e envia o QR code por email
+      await enviarQRCode({
+        id_cliente:    clienteId,
+        id_reserva:    novaReserva.id_reserva,
+        email:         clienteData.pessoa.email,
+        nome:          clienteData.pessoa.nome,
+        titulo:        livro.titulo,
+        isbn:          livro.isbn,
+        prazo_validade,
+      });
+
+      // 7. Sucesso
       setSucesso(true);
       onSuccess?.();
 
@@ -118,10 +134,11 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
       <div className="reserve-book">
         <div className="text-center py-4">
           <div className="text-green-400 text-4xl mb-3">✓</div>
-          <h3 className="text-white font-semibold text-lg mb-2">Reserva solicitada!</h3>
+          <h3 className="text-white font-semibold text-lg mb-2">Reserva confirmada!</h3>
           <p className="text-slate-400 text-sm mb-6">
             Sua reserva de <span className="text-white font-medium">{livro.titulo}</span> foi
-            enviada e está aguardando aprovação do bibliotecário.
+            realizada. Enviamos um <span className="text-green-400 font-medium">QR code</span> para
+            o seu email — apresente-o na biblioteca para retirar o livro.
           </p>
           <button
             className="w-full py-2 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors"
@@ -162,6 +179,13 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
           {livro.status}
         </span>
       </div>
+
+      {/* Aviso validade */}
+      {livro.status === 'Disponível' && (
+        <p className="text-slate-400 text-xs mb-4">
+          📅 Após a reserva você receberá um QR code por email válido por <strong className="text-white">5 dias</strong>.
+        </p>
+      )}
 
       {/* Aviso se indisponível */}
       {livro.status !== 'Disponível' && (

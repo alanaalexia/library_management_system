@@ -28,6 +28,43 @@ const TEMPLATES: Record<string, (dados: Record<string, string>) => { assunto: st
     `,
   }),
 
+  qrcode_reserva: ({ nome, titulo, isbn, prazo_validade, qrCodeBase64 }) => ({
+    assunto: `📚 Seu QR code de reserva — ${titulo}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0f172a; color: #f1f5f9; border-radius: 12px;">
+        <h1 style="color: #60a5fa; font-size: 22px; margin-bottom: 8px;">Bibliotheca+</h1>
+        <h2 style="font-size: 18px; margin-bottom: 16px;">Reserva confirmada! 📚</h2>
+
+        <p style="color: #cbd5e1; line-height: 1.6;">
+          Olá, <strong>${nome}</strong>!
+        </p>
+        <p style="color: #cbd5e1; line-height: 1.6;">
+          Sua reserva foi realizada com sucesso. Apresente o QR code abaixo na biblioteca para retirar o livro.
+        </p>
+
+        <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; margin: 24px 0;">
+          <p style="margin: 0 0 8px; color: #cbd5e1;"><strong style="color: #f1f5f9;">Livro:</strong> ${titulo}</p>
+          <p style="margin: 0 0 8px; color: #cbd5e1;"><strong style="color: #f1f5f9;">ISBN:</strong> ${isbn}</p>
+          <p style="margin: 0; color: #f87171;"><strong style="color: #f1f5f9;">Válido até:</strong> ${prazo_validade}</p>
+        </div>
+
+        <div style="text-align: center; margin: 24px 0; background: #ffffff; padding: 16px; border-radius: 8px; display: inline-block; width: 100%; box-sizing: border-box;">
+          <img
+            src="${qrCodeBase64}"
+            alt="QR Code da reserva"
+            style="width: 200px; height: 200px; display: block; margin: 0 auto;"
+          />
+        </div>
+
+        <p style="margin-top: 24px; font-size: 12px; color: #475569; line-height: 1.6;">
+          Este QR code expira em <strong style="color: #94a3b8;">${prazo_validade}</strong>.
+          Após essa data a reserva será cancelada automaticamente.<br/>
+          Se você não realizou esta reserva, entre em contato com a biblioteca.
+        </p>
+      </div>
+    `,
+  }),
+
   // Exemplos de templates futuros — descomente e adapte quando precisar:
   // cadastro_rejeitado: ({ nome }) => ({ ... }),
   // conta_suspensa: ({ nome }) => ({ ... }),
@@ -75,7 +112,7 @@ serve(async (req) => {
       body: JSON.stringify({
         sender: {
           name: "Bibliotheca+",
-          email: Deno.env.get("REMETENTE_EMAIL"), // cadastrado como secret no Supabase
+          email: Deno.env.get("REMETENTE_EMAIL"),
         },
         to: [{ email: para }],
         subject: assunto,
