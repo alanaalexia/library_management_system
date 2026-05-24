@@ -66,7 +66,7 @@ export default function StudentMyBooks() {
           livro (isbn, titulo, autor, editora, idioma)
         `)
         .eq("id_cliente", clienteId)
-        .eq("status", "ativo");
+        .in("status", ["ativo", "atrasado"]);
 
       if (erroEmprestimos) throw erroEmprestimos;
 
