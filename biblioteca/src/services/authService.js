@@ -2,7 +2,16 @@ import { supabase } from './supabaseClient';
 
 const DOMINIOS_INSTITUCIONAIS = ["@biblioteca.com", "@instituicao.edu"];
 
-// ─── HELPERS ────────────────────────────────────────────────────────────────
+// ─── MENSAGENS CENTRALIZADAS ─────────────────────────────────────────────────
+
+const MENSAGENS_STATUS = {
+  'Pendente':  'Seu cadastro está aguardando aprovação do bibliotecário.',
+  'Rejeitado': 'Seu cadastro foi rejeitado pelo bibliotecário. Entre em contato para mais informações.',
+  'Suspenso':  'Sua conta está suspensa por 30 dias devido à não devolução de livros.',
+  'Banido':    'Sua conta foi banida. Entre em contato com um bibliotecário.',
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 const getProfile = async (userId) => {
   const { data, error } = await supabase
@@ -17,22 +26,14 @@ const getProfile = async (userId) => {
 // ─── REGRAS DE ACESSO ────────────────────────────────────────────────────────
 
 /**
- * Valida se o perfil pode acessar o sistema.
- * Lança erro com mensagem amigável se não puder.
+ * Valida acesso completo (login via email/senha).
+ * Inclui verificação de bibliotecário único.
  */
 const validarAcesso = async (profile) => {
-  if (!profile) {
-    throw new Error('Perfil não encontrado. Entre em contato com o bibliotecário.');
-  }
+  if (!profile) throw new Error('Perfil não encontrado. Entre em contato com o bibliotecário.');
 
   if (profile.status !== 'Ativo') {
-    const mensagens = {
-      'Pendente':  'Seu cadastro está aguardando aprovação do bibliotecário.',
-      'Rejeitado': 'Seu cadastro foi rejeitado pelo bibliotecário. Entre em contato para mais informações.',
-      'Suspenso':  'Sua conta está suspensa por 30 dias devido à não devolução de livros.',
-      'Banido':    'Sua conta foi banida. Entre em contato com um bibliotecário.',
-    };
-    throw new Error(mensagens[profile.status] ?? 'Acesso não autorizado. Entre em contato com o bibliotecário.');
+    throw new Error(MENSAGENS_STATUS[profile.status] ?? 'Acesso não autorizado. Entre em contato com o bibliotecário.');
   }
 
   if (profile.papel === 'bibliotecario') {
@@ -42,38 +43,57 @@ const validarAcesso = async (profile) => {
       .eq('esta_logado', true)
       .neq('id_pessoa', profile.id_pessoa)
       .maybeSingle();
-
     if (error) throw error;
+    if (data) throw new Error('Já existe um bibliotecário ativo no sistema. Aguarde o logout dele para entrar.');
+  }
+};
 
-    if (data) {
-      throw new Error('Já existe um bibliotecário ativo no sistema. Aguarde o logout dele para entrar.');
-    }
+/**
+ * Valida acesso via OAuth/SIGNED_IN (sem signOut automático — o AuthContext cuida disso).
+ * Inclui verificação de bibliotecário único.
+ */
+export const validarAcessoPublico = async (profile, userId) => {
+  if (!profile) throw new Error('Perfil não encontrado. Entre em contato com o bibliotecário.');
+
+  if (profile.status !== 'Ativo') {
+    throw new Error(MENSAGENS_STATUS[profile.status] ?? 'Acesso não autorizado. Entre em contato com o bibliotecário.');
+  }
+
+  if (profile.papel === 'bibliotecario') {
+    const { data, error } = await supabase
+      .from('bibliotecario')
+      .select('id_pessoa')
+      .eq('esta_logado', true)
+      .neq('id_pessoa', profile.id_pessoa)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) throw new Error('Já existe um bibliotecário ativo no sistema. Aguarde o logout dele para entrar.');
   }
 };
 
 /**
  * Marca esta_logado = true para bibliotecários.
+ * Exportado para uso no AuthContext (SIGNED_IN e INITIAL_SESSION).
  */
-const marcarLogado = async (userId) => {
-  console.log('🔄 Marcando bibliotecário como logado:', userId);
+export const marcarLogadoBibliotecario = async (profile) => {
+  if (profile.papel !== 'bibliotecario') return;
 
   const { error } = await supabase
     .from('bibliotecario')
     .update({ esta_logado: true })
-    .eq('id_pessoa', userId);
+    .eq('id_pessoa', profile.id_pessoa);
 
   if (error) {
-    console.error('❌ ERRO ao marcar bibliotecário como logado:', error);
+    console.error('❌ Erro ao marcar bibliotecário como logado:', error);
     throw error;
   }
 
-  console.log('✅ Bibliotecário marcado como logado:', userId);
+  console.log('✅ Bibliotecário marcado como logado:', profile.id_pessoa);
 };
 
 /**
  * Marca esta_logado = false para bibliotecários.
- * Silencia erros — chamado em contextos onde o usuário pode já ter sido
- * deslogado (fechamento de aba, timeout, etc).
+ * Silencia erros — chamado em contextos onde o usuário pode já ter sido deslogado.
  */
 export const marcarDeslogado = async (userId) => {
   try {
@@ -90,10 +110,6 @@ export const marcarDeslogado = async (userId) => {
 
 // ─── SYNC OAUTH ──────────────────────────────────────────────────────────────
 
-/**
- * Sincronização exclusiva para OAuth (Google, etc).
- * Usuários de cadastro manual já são inseridos pelo register().
- */
 export const syncOrCreateUser = async (user) => {
   const isOAuth = user.app_metadata?.provider !== 'email';
   if (!isOAuth) return;
@@ -165,14 +181,6 @@ export const register = async (userData) => {
   return authData;
 };
 
-/**
- * Login com email/senha.
- * Valida status e regra de bibliotecário único ANTES de deixar entrar.
- * Se a validação falhar, faz logout imediato para não deixar sessão aberta.
- *
- * FIX: retorna { user, session, profile } explicitamente para o AuthContext
- * conseguir desestruturar corretamente.
- */
 export const login = async (email, password) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
@@ -180,17 +188,8 @@ export const login = async (email, password) => {
   try {
     const profile = await getProfile(data.user.id);
     await validarAcesso(profile);
-
-    if (profile.papel === 'bibliotecario') {
-      await marcarLogado(data.user.id);
-    }
-
-    // FIX: retorno explícito com user, session e profile separados
-    return {
-      user: data.user,
-      session: data.session,
-      profile,
-    };
+    await marcarLogadoBibliotecario(profile);
+    return { user: data.user, session: data.session, profile };
   } catch (validationError) {
     await supabase.auth.signOut();
     throw validationError;
@@ -198,9 +197,7 @@ export const login = async (email, password) => {
 };
 
 export const logout = async (userId, papel) => {
-  if (papel === 'bibliotecario' && userId) {
-    await marcarDeslogado(userId);
-  }
+  if (papel === 'bibliotecario' && userId) await marcarDeslogado(userId);
   const { error } = await supabase.auth.signOut();
   if (error) {
     console.error('Erro ao fazer logout:', error);

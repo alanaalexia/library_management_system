@@ -7,6 +7,8 @@ import {
   syncOrCreateUser,
   marcarDeslogado,
   signInWithGoogle,
+  validarAcessoPublico,
+  marcarLogadoBibliotecario,
 } from "../services/authService";
 
 export const AuthContext = createContext(null);
@@ -50,54 +52,14 @@ export function AuthProvider({ children }) {
                   .select('*')
                   .eq('id_pessoa', session.user.id)
                   .maybeSingle();
-
                 if (data) { profile = data; break; }
                 if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 800));
               }
 
               if (profile) {
-                if (profile.status !== 'Ativo') {
-                  await supabase.auth.signOut();
-                  setUser(null);
-                  const mensagens = {
-                    'Pendente':  'Seu cadastro está aguardando aprovação do bibliotecário.',
-                    'Rejeitado': 'Seu cadastro foi rejeitado pelo bibliotecário. Entre em contato para mais informações.',
-                    'Suspenso':  'Sua conta está suspensa por 30 dias devido à não devolução de livros dentro do prazo.',
-                    'Banido':    'Sua conta foi banida. Entre em contato com um bibliotecário.',
-                  };
-                  setError(mensagens[profile.status] ?? 'Acesso não autorizado. Entre em contato com o bibliotecário.');
-                  return;
-                }
-
-                if (profile.papel === 'bibliotecario') {
-                  const { data: bibLogado } = await supabase
-                    .from('bibliotecario')
-                    .select('id_pessoa')
-                    .eq('esta_logado', true)
-                    .neq('id_pessoa', profile.id_pessoa)
-                    .maybeSingle();
-
-                  if (bibLogado) {
-                    await supabase.auth.signOut();
-                    setUser(null);
-                    setError('Já existe um bibliotecário ativo no sistema. Aguarde o logout dele para entrar.');
-                    return;
-                  }
-
-                  const { error: updateError } = await supabase
-                    .from('bibliotecario')
-                    .update({ esta_logado: true })
-                    .eq('id_pessoa', profile.id_pessoa);
-
-                  if (updateError) {
-                    console.error('❌ [SIGNED_IN] ERRO na atualização:', updateError);
-                    await supabase.auth.signOut();
-                    setUser(null);
-                    setError('Erro ao processar login do bibliotecário. Tente novamente.');
-                    return;
-                  }
-                }
-
+                // Valida acesso — lança erro com mensagem centralizada no authService
+                await validarAcessoPublico(profile, session.user.id);
+                await marcarLogadoBibliotecario(profile);
                 setUser({ ...session.user, ...profile });
                 setError(null);
               } else {
@@ -105,8 +67,9 @@ export function AuthProvider({ children }) {
                 setUser(null);
               }
             } catch (err) {
-              console.error('[SIGNED_IN] erro:', err);
+              await supabase.auth.signOut();
               setUser(null);
+              setError(err.message);
             } finally {
               setLoading(false);
             }
@@ -119,19 +82,8 @@ export function AuthProvider({ children }) {
             try {
               if (session?.user) {
                 const profile = await fetchProfile(session.user);
-
-                // FIX: comparação com 'Ativo' (capital) — correto conforme schema
                 if (profile && profile.status === 'Ativo') {
-                  if (profile.papel === 'bibliotecario') {
-                    const { error: updateError } = await supabase
-                      .from('bibliotecario')
-                      .update({ esta_logado: true })
-                      .eq('id_pessoa', profile.id_pessoa);
-
-                    if (updateError) {
-                      console.error('❌ [INITIAL_SESSION] Erro ao marcar bibliotecário:', updateError);
-                    }
-                  }
+                  await marcarLogadoBibliotecario(profile);
                   setUser({ ...session.user, ...profile });
                 } else {
                   if (session) await supabase.auth.signOut();
@@ -150,16 +102,8 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        if (event === 'TOKEN_REFRESHED') {
-          setLoading(false);
-          return;
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setLoading(false);
-          return;
-        }
+        if (event === 'TOKEN_REFRESHED') { setLoading(false); return; }
+        if (event === 'SIGNED_OUT')      { setUser(null); setLoading(false); return; }
 
         setLoading(false);
       }
@@ -170,22 +114,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const handleUnload = () => {
-      if (user?.papel === 'bibliotecario') {
-        marcarDeslogado(user.id_pessoa);
-      }
+      if (user?.papel === 'bibliotecario') marcarDeslogado(user.id_pessoa);
     };
     window.addEventListener('beforeunload', handleUnload);
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [user]);
 
-  // ─── ACTIONS ─────────────────────────────────────────────────────────────
+  // ─── ACTIONS ──────────────────────────────────────────────────────────────
 
   const login = async (email, password) => {
     setLoading(true);
     setError(null);
     setSuccess(false);
     try {
-      // FIX: authService.login agora retorna { user, session, profile } explicitamente
       const { user: authUser, profile } = await loginService(email, password);
       setUser({ ...authUser, ...profile });
     } catch (err) {
@@ -233,15 +174,8 @@ export function AuthProvider({ children }) {
   };
 
   const value = {
-    user,
-    loading,
-    error,
-    success,
-    setSuccess,
-    login,
-    register,
-    handleOAuth,
-    logout,
+    user, loading, error, success,
+    setSuccess, login, register, handleOAuth, logout,
   };
 
   return (

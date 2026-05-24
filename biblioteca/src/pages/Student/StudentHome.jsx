@@ -103,7 +103,7 @@ const StudentHome = ({ userProfile }) => {
 
         <div className="flex flex-col gap-3 items-center">
           <ActionCard title="Acervo" onClick={() => navigate('/acervo')} />
-          <ActionCard title="Empréstimos" onClick={() => navigate('/meus-livros')} />
+          <ActionCard title="Meus Livros" onClick={() => navigate('/meus-livros')} />
         </div>
 
         <div className="bg-black/50 border border-white/10 rounded-md px-6 py-4 text-left min-w-[260px]">
@@ -113,9 +113,11 @@ const StudentHome = ({ userProfile }) => {
             <span className="font-semibold text-red-400">
               {loading ? '—' : atrasados}
             </span>
-            <span className="text-white/90">
-              {loading ? 'livro(s) atrasado(s).' : palavra(atrasados, 'livro atrasado.', 'livros atrasados.')}
-            </span>
+            {!loading && (
+              <span className="text-white/90">
+                {palavra(atrasados, 'livro atrasado.', 'livros atrasados.')}
+              </span>
+            )}
           </div>
 
           {/* Emprestados */}
@@ -123,9 +125,11 @@ const StudentHome = ({ userProfile }) => {
             <span className="font-semibold text-blue-400">
               {loading ? '—' : emprestados}
             </span>
-            <span className="text-white/90">
-              {loading ? 'livro(s) emprestado(s).' : palavra(emprestados, 'livro emprestado.', 'livros emprestados.')}
-            </span>
+            {!loading && (
+              <span className="text-white/90">
+                {palavra(emprestados, 'livro emprestado.', 'livros emprestados.')}
+              </span>
+            )}
           </div>
 
           {/* Reservados */}
@@ -133,9 +137,11 @@ const StudentHome = ({ userProfile }) => {
             <span className="font-semibold text-yellow-400">
               {loading ? '—' : reservados}
             </span>
-            <span className="text-white/90">
-              {loading ? 'livro(s) reservado(s).' : palavra(reservados, 'livro reservado.', 'livros reservados.')}
-            </span>
+            {!loading && (
+              <span className="text-white/90">
+                {palavra(reservados, 'livro reservado.', 'livros reservados.')}
+              </span>
+            )}
           </div>
 
           {/* Alertas de prazo */}
