@@ -5,14 +5,13 @@ import StudentHeader from "./StudentHeader";
 import BaseTable from "../../components/BaseTable";
 import ReenviarQRCode from "../../components/ReenviarQRCode";
 
-const COLUNAS = ["isbn", "titulo", "autor", "editora", "idioma", "tipo", "status", "prazo"];
+const COLUNAS = ["isbn", "titulo", "autor", "editora", "idioma", "status", "prazo"];
 const LABELS = {
   isbn:    "ISBN",
   titulo:  "Título",
   autor:   "Autor",
   editora: "Editora",
   idioma:  "Idioma",
-  tipo:    "Tipo",
   status:  "Status",
   prazo:   "Prazo",
 };
