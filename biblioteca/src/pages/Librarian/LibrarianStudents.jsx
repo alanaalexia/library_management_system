@@ -8,26 +8,26 @@ import LibrarianHeader from "./LibrarianHeader";
 const COLUNAS = ["nome", "email", "status"];
 
 const LABELS = {
-  nome: "NOME",
-  email: "E-MAIL",
+  nome:   "NOME",
+  email:  "E-MAIL",
   status: "STATUS",
 };
 
 const COMBOBOX = {
   status: {
-    options: ["Pendente", "Ativo", "Rejeitado", "Suspenso", "Banido"],
+    options: ["Pendente", "Ativo", "Rejeitado", "Banido"],
     default: "Pendente",
   },
 };
 
 export default function LibrarianStudents() {
-  const [dados, setDados] = useState([]);
-  const [dadosOriginais, setDadosOriginais] = useState([]);
-  const [modoEdicao, setModoEdicao] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState({ tipo: "", texto: "" });
+  const [dados, setDados]                       = useState([]);
+  const [dadosOriginais, setDadosOriginais]     = useState([]);
+  const [modoEdicao, setModoEdicao]             = useState(false);
+  const [loading, setLoading]                   = useState(false);
+  const [msg, setMsg]                           = useState({ tipo: "", texto: "" });
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
-  const [idsDeletados, setIdsDeletados] = useState([]);
+  const [idsDeletados, setIdsDeletados]         = useState([]);
 
   const criarLinhaVazia = () =>
     COLUNAS.reduce((acc, col) => ({
@@ -46,7 +46,7 @@ export default function LibrarianStudents() {
       if (error) throw error;
       const linhas = [...(data || []), criarLinhaVazia()];
       setDados(linhas);
-      setDadosOriginais(data || []); // salva snapshot para comparação ao salvar
+      setDadosOriginais(data || []);
     } catch {
       setMsg({ tipo: "erro", texto: "Não foi possível carregar os estudantes." });
     } finally {
@@ -97,7 +97,6 @@ export default function LibrarianStudents() {
     );
     setLoading(true);
     try {
-      // Deletar
       if (idsDeletados.length > 0) {
         const { error } = await supabase
           .from("pessoa")
@@ -117,7 +116,6 @@ export default function LibrarianStudents() {
           status: resto.status || "Pendente",
         }));
 
-      // Atualizar existentes + disparar email se status mudou para Ativo
       for (const linha of linhasExistentes) {
         const { id_pessoa, criado_em, atualizado_em, ...campos } = linha;
         const { error } = await supabase
@@ -126,7 +124,6 @@ export default function LibrarianStudents() {
           .eq("id_pessoa", id_pessoa);
         if (error) throw error;
 
-        // Verifica se esse usuário tinha status diferente de Ativo antes de salvar
         const original = dadosOriginais.find(d => d.id_pessoa === id_pessoa);
         const foiAtivadoAgora = original?.status !== 'Ativo' && campos.status === 'Ativo';
 
@@ -134,13 +131,11 @@ export default function LibrarianStudents() {
           try {
             await enviarEmail('cadastro_aprovado', linha.email, { nome: linha.nome });
           } catch (emailErr) {
-            // Não bloqueia o salvamento se o email falhar — só loga
             console.warn(`[LibrarianStudents] Falha ao enviar email para ${linha.email}:`, emailErr.message);
           }
         }
       }
 
-      // Inserir novos
       if (linhasNovas.length > 0) {
         const { error } = await supabase.from("pessoa").insert(linhasNovas);
         if (error) throw error;
@@ -193,6 +188,7 @@ export default function LibrarianStudents() {
             comboboxConfig={COMBOBOX}
             columnLabels={LABELS}
             allowNewRow={false}
+            readOnlyCells={(row, col) => col === "status" && row.status === "Suspenso"}
           />
         </div>
 

@@ -43,6 +43,8 @@ export default function BooksManagement({ mode }) {
     setLoading(true);
     try {
       await supabase.rpc('expirar_reservas_vencidas');
+      await supabase.rpc('marcar_emprestimos_atrasados');
+      await supabase.rpc('reativar_suspensoes_expiradas');
 
       const { data, error } = await supabase
         .from("livro")
@@ -302,7 +304,7 @@ export default function BooksManagement({ mode }) {
       label:       "Retornar",
       buttonLabel: "Retornar",
       buttonColor: "#b45309",
-      showWhen:    { key: "status", value: ["Emprestado", "Atrasado"] },
+      showWhen:    { key: "status", value: ["Emprestado", "atrasado"] },
       onClick:     handleRetornar,
     },
   ] : [];

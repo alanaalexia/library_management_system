@@ -32,6 +32,7 @@ export default function BaseTable({
   allowNewRow = true,
   extraColumns = [],
   readOnlyColumns = [], // colunas sempre somente leitura
+  readOnlyCells = null,  // (row, col) => bool
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -94,6 +95,7 @@ export default function BaseTable({
     const options = getOptions(col);
     const isLocked = col.includes("id_") || col.includes("_em");
     const isReadOnlyCol = readOnlyColumns.includes(col);
+    const isCellReadOnly = readOnlyCells ? readOnlyCells(row, col) : false;
     const value = row[col] ?? getDefault(col);
     const isLastRow = originalIndex === data.length - 1;
 
@@ -101,7 +103,7 @@ export default function BaseTable({
     const temConteudo = outrasColunas.some(c => row[c] && row[c].toString().trim() !== "");
     const mostrarCombobox = !isLastRow || temConteudo || selectedRowIndex === originalIndex;
 
-    if (options && !isReadOnly && !isLocked && !isReadOnlyCol && mostrarCombobox) {
+    if (options && !isReadOnly && !isLocked && !isReadOnlyCol && !isCellReadOnly && mostrarCombobox) {
       return (
         <select
           value={value}
@@ -119,13 +121,13 @@ export default function BaseTable({
 
     return (
       <input
-        readOnly={isReadOnly || isLocked || isReadOnlyCol}
+        readOnly={isReadOnly || isLocked || isReadOnlyCol || isCellReadOnly}
         value={options && !mostrarCombobox ? "" : value}
         onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
         className={`w-full h-full bg-transparent px-3 outline-none text-sm text-center
           ${isReadOnly ? "cursor-default" : "focus:bg-blue-900/30"}
           ${isLocked ? "text-slate-500 bg-slate-800/20" : ""}
-          ${isReadOnlyCol ? "text-white cursor-default" : ""}
+          ${isReadOnlyCol || isCellReadOnly ? "text-white cursor-default" : ""}
         `}
       />
     );
