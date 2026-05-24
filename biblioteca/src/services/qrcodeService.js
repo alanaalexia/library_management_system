@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { supabase } from './supabaseClient';
 import { enviarEmail } from './emailService';
 
@@ -16,20 +15,12 @@ function montarPayload({ titulo, isbn, prazo_validade, id_reserva }) {
 }
 
 /**
- * Gera a imagem QR code em base64 (data URL).
- * Pode ser embutida diretamente em <img src={...}> ou em um email HTML.
+ * Gera a URL da imagem QR code via Google Charts API.
+ * O Gmail (e qualquer cliente de email) aceita sem bloqueio.
  */
-async function gerarQRCodeBase64(payload) {
-  try {
-    return await QRCode.toDataURL(payload, {
-      width: 300,
-      margin: 2,
-      color: { dark: '#000000', light: '#ffffff' },
-    });
-  } catch (err) {
-    console.error('[qrcodeService] Erro ao gerar QR code:', err);
-    throw new Error('Falha ao gerar o QR code.');
-  }
+function gerarQRCodeUrl(payload) {
+  const encoded = encodeURIComponent(payload);
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encoded}&format=png`;
 }
 
 /**
@@ -59,7 +50,7 @@ function formatarData(dataStr) {
 }
 
 /**
- * Fluxo completo: gera o QR code, envia por email e registra a notificação.
+ * Fluxo completo: gera a URL do QR code, envia por email e registra a notificação.
  *
  * @param {object} params
  * @param {string} params.id_cliente     - id do cliente
@@ -71,15 +62,15 @@ function formatarData(dataStr) {
  * @param {string} params.prazo_validade - validade no formato YYYY-MM-DD
  */
 export async function enviarQRCode({ id_cliente, id_reserva, email, nome, titulo, isbn, prazo_validade }) {
-  const payload      = montarPayload({ titulo, isbn, prazo_validade, id_reserva });
-  const qrCodeBase64 = await gerarQRCodeBase64(payload);
+  const payload     = montarPayload({ titulo, isbn, prazo_validade, id_reserva });
+  const qrCodeUrl   = gerarQRCodeUrl(payload);
 
   await enviarEmail('qrcode_reserva', email, {
     nome,
     titulo,
     isbn,
     prazo_validade: formatarData(prazo_validade),
-    qrCodeBase64,
+    qrCodeUrl,  // URL externa — funciona em qualquer cliente de email
   });
 
   await registrarNotificacao({ id_cliente, id_reserva, conteudo: payload });

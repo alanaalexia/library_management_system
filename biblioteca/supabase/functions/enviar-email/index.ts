@@ -28,7 +28,7 @@ const TEMPLATES: Record<string, (dados: Record<string, string>) => { assunto: st
     `,
   }),
 
-  qrcode_reserva: ({ nome, titulo, isbn, prazo_validade, qrCodeBase64 }) => ({
+  qrcode_reserva: ({ nome, titulo, isbn, prazo_validade, qrCodeUrl }) => ({
     assunto: `📚 Seu QR code de reserva — ${titulo}`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0f172a; color: #f1f5f9; border-radius: 12px;">
@@ -48,11 +48,13 @@ const TEMPLATES: Record<string, (dados: Record<string, string>) => { assunto: st
           <p style="margin: 0; color: #f87171;"><strong style="color: #f1f5f9;">Válido até:</strong> ${prazo_validade}</p>
         </div>
 
-        <div style="text-align: center; margin: 24px 0; background: #ffffff; padding: 16px; border-radius: 8px; display: inline-block; width: 100%; box-sizing: border-box;">
+        <div style="text-align: center; margin: 24px 0; background: #ffffff; padding: 16px; border-radius: 8px;">
           <img
-            src="${qrCodeBase64}"
+            src="${qrCodeUrl}"
             alt="QR Code da reserva"
-            style="width: 200px; height: 200px; display: block; margin: 0 auto;"
+            width="220"
+            height="220"
+            style="display: block; margin: 0 auto;"
           />
         </div>
 
