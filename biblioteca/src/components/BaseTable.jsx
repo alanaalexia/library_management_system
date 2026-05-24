@@ -31,6 +31,7 @@ export default function BaseTable({
   columnLabels = {},
   allowNewRow = true,
   extraColumns = [],
+  readOnlyColumns = [], // colunas sempre somente leitura
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -92,6 +93,7 @@ export default function BaseTable({
   const renderCell = (col, row, originalIndex) => {
     const options = getOptions(col);
     const isLocked = col.includes("id_") || col.includes("_em");
+    const isReadOnlyCol = readOnlyColumns.includes(col);
     const value = row[col] ?? getDefault(col);
     const isLastRow = originalIndex === data.length - 1;
 
@@ -99,7 +101,7 @@ export default function BaseTable({
     const temConteudo = outrasColunas.some(c => row[c] && row[c].toString().trim() !== "");
     const mostrarCombobox = !isLastRow || temConteudo || selectedRowIndex === originalIndex;
 
-    if (options && !isReadOnly && !isLocked && mostrarCombobox) {
+    if (options && !isReadOnly && !isLocked && !isReadOnlyCol && mostrarCombobox) {
       return (
         <select
           value={value}
@@ -113,14 +115,17 @@ export default function BaseTable({
       );
     }
 
+    // Para células sem combobox na linha nova: esconde se vazio e não selecionado
+
     return (
       <input
-        readOnly={isReadOnly || isLocked}
+        readOnly={isReadOnly || isLocked || isReadOnlyCol}
         value={options && !mostrarCombobox ? "" : value}
         onChange={(e) => onCellChange(originalIndex, col, e.target.value)}
         className={`w-full h-full bg-transparent px-3 outline-none text-sm text-center
           ${isReadOnly ? "cursor-default" : "focus:bg-blue-900/30"}
           ${isLocked ? "text-slate-500 bg-slate-800/20" : ""}
+          ${isReadOnlyCol ? "text-white cursor-default" : ""}
         `}
       />
     );
@@ -212,10 +217,10 @@ export default function BaseTable({
                     }}
                   >
                     {showIcon && (
-                      <div className="flex flex-col gap-0.5 justify-center items-center h-full w-full py-2">
-                        <span className="w-4 h-0.5 bg-slate-400 block"></span>
-                        <span className="w-4 h-0.5 bg-slate-400 block"></span>
-                        <span className="w-4 h-0.5 bg-slate-400 block"></span>
+                      <div className="flex flex-col gap-[4px] justify-center items-center">
+                        {[...Array(3)].map((_, i) => (
+                          <span key={i} className="w-[3px] h-[3px] rounded-full bg-slate-400 block"></span>
+                        ))}
                       </div>
                     )}
                   </td>

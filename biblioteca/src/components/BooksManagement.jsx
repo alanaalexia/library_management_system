@@ -14,12 +14,7 @@ const LABELS_ACERVO = {
   idioma: "Idioma",
   status: "Status",
 };
-const COMBOBOX_ACERVO = {
-  status: {
-    options: ["Disponível", "Reservado", "Emprestado"],
-    default: "Disponível",
-  },
-};
+const COMBOBOX_ACERVO = {};
 
 export default function BooksManagement({ mode }) {
   const isLibrarian = mode === "librarian";
@@ -39,15 +34,14 @@ export default function BooksManagement({ mode }) {
   const criarLinhaVazia = () =>
     COLUNAS_ACERVO.reduce((acc, col) => ({
       ...acc,
-      [col]: COMBOBOX_ACERVO[col]?.default ?? "",
+      [col]: col === "status" ? "Disponível" : "",
     }), {});
 
   // ─── Carregar livros ───────────────────────────────────────────────────────
 
-  const carregarLivros = useCallback(async () => {
+  const carregarLivros = useCallback(async (editando = false) => {
     setLoading(true);
     try {
-      // Expira reservas vencidas antes de carregar
       await supabase.rpc('expirar_reservas_vencidas');
 
       const { data, error } = await supabase
@@ -56,7 +50,9 @@ export default function BooksManagement({ mode }) {
         .order("titulo", { ascending: true });
       if (error) throw error;
       const base = data || [];
-      setDados(isLibrarian ? [...base, criarLinhaVazia()] : base);
+
+      // Linha nova no início, só no modo edição
+      setDados(isLibrarian && editando ? [criarLinhaVazia(), ...base] : base);
     } catch {
       setMsg({ tipo: "erro", texto: "Não foi possível carregar os livros." });
     } finally {
@@ -81,6 +77,13 @@ export default function BooksManagement({ mode }) {
     buscarClienteId();
   }, [isLibrarian, user?.id_pessoa]);
 
+  // ─── Entrar no modo edição ─────────────────────────────────────────────────
+
+  const handleEntrarEdicao = async () => {
+    setModoEdicao(true);
+    await carregarLivros(true); // carrega com linha vazia no início
+  };
+
   // ─── Tecla Delete (modo edição bibliotecário) ──────────────────────────────
 
   useEffect(() => {
@@ -89,7 +92,7 @@ export default function BooksManagement({ mode }) {
       const tag = document.activeElement.tagName;
       if (tag === "INPUT" || tag === "SELECT") return;
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedRowIndex === dados.length - 1) return;
+        if (selectedRowIndex === 0 && !dados[0]?.id_livro) return; // protege linha nova
         const linha = dados[selectedRowIndex];
         if (linha?.isbn) setIsbnDeletados(prev => [...prev, linha.isbn]);
         setDados(prev => prev.filter((_, idx) => idx !== selectedRowIndex));
@@ -105,16 +108,6 @@ export default function BooksManagement({ mode }) {
   const handleCellChange = (rowIndex, columnName, value) => {
     const novosDados = [...dados];
     novosDados[rowIndex] = { ...novosDados[rowIndex], [columnName]: value };
-    if (rowIndex === dados.length - 1) {
-      const temConteudo = Object.values(novosDados[rowIndex]).some(
-        val =>
-          val !== undefined &&
-          val !== null &&
-          String(val).trim() !== "" &&
-          val !== (COMBOBOX_ACERVO[columnName]?.default ?? "")
-      );
-      if (temConteudo) novosDados.push(criarLinhaVazia());
-    }
     setDados(novosDados);
   };
 
@@ -122,14 +115,25 @@ export default function BooksManagement({ mode }) {
 
   const salvarAlteracoes = async () => {
     setMsg({ tipo: "", texto: "" });
+
     const linhasParaValidar = dados.filter(row =>
       Object.entries(row).some(([col, val]) =>
+        col !== "status" &&
         val !== undefined &&
         val !== null &&
-        String(val).trim() !== "" &&
-        val !== (COMBOBOX_ACERVO[col]?.default ?? "")
+        String(val).trim() !== ""
       )
     );
+
+    // Validação: ISBN obrigatório em todas as linhas com conteúdo
+    const semIsbn = linhasParaValidar.filter(
+      row => !row.isbn || String(row.isbn).trim() === ""
+    );
+    if (semIsbn.length > 0) {
+      setMsg({ tipo: "erro", texto: "Todas as linhas precisam ter o ISBN preenchido." });
+      return;
+    }
+
     setLoading(true);
     try {
       if (isbnDeletados.length > 0) {
@@ -162,7 +166,7 @@ export default function BooksManagement({ mode }) {
       setIsbnDeletados([]);
       setSelectedRowIndex(null);
       setModoEdicao(false);
-      await carregarLivros();
+      await carregarLivros(false);
     } catch (error) {
       setMsg({ tipo: "erro", texto: `Erro ao salvar: ${error.message}` });
     } finally {
@@ -175,7 +179,7 @@ export default function BooksManagement({ mode }) {
     setModoEdicao(false);
     setSelectedRowIndex(null);
     setIsbnDeletados([]);
-    carregarLivros();
+    carregarLivros(false);
   };
 
   // ─── Reserva (estudante) ───────────────────────────────────────────────────
@@ -195,7 +199,7 @@ export default function BooksManagement({ mode }) {
     setModalReserva(false);
     setSelectedRowIndex(null);
     setMsg({ tipo: "sucesso", texto: "Livro reservado com sucesso! QRcode enviado para seu email." });
-    await carregarLivros();
+    await carregarLivros(false);
   };
 
   // ─── Emprestar (bibliotecário) ─────────────────────────────────────────────
@@ -203,7 +207,6 @@ export default function BooksManagement({ mode }) {
   const handleEmpresitar = async (row) => {
     setMsg({ tipo: "", texto: "" });
     try {
-      // Busca a reserva ativa mais recente do livro
       const { data: reserva, error: erroReserva } = await supabase
         .from("reserva")
         .select("id_reserva, id_cliente")
@@ -219,12 +222,10 @@ export default function BooksManagement({ mode }) {
         return;
       }
 
-      // Prazo de devolução: 30 dias a partir de hoje
       const prazo = new Date();
       prazo.setDate(prazo.getDate() + 30);
       const prazoDevolucao = prazo.toISOString().split("T")[0];
 
-      // Cria o empréstimo
       const { error: erroEmprestimo } = await supabase
         .from("emprestimo")
         .insert({
@@ -237,7 +238,6 @@ export default function BooksManagement({ mode }) {
 
       if (erroEmprestimo) throw erroEmprestimo;
 
-      // Marca a reserva como convertida
       const { error: erroAtualizaReserva } = await supabase
         .from("reserva")
         .update({ status: "convertida" })
@@ -246,7 +246,7 @@ export default function BooksManagement({ mode }) {
       if (erroAtualizaReserva) throw erroAtualizaReserva;
 
       setMsg({ tipo: "sucesso", texto: `Empréstimo de "${row.titulo}" criado com prazo de 30 dias.` });
-      await carregarLivros();
+      await carregarLivros(modoEdicao);
     } catch (error) {
       setMsg({ tipo: "erro", texto: `Erro ao emprestar: ${error.message}` });
     }
@@ -257,7 +257,6 @@ export default function BooksManagement({ mode }) {
   const handleRetornar = async (row) => {
     setMsg({ tipo: "", texto: "" });
     try {
-      // Busca o empréstimo ativo do livro
       const { data: emprestimo, error: erroEmprestimo } = await supabase
         .from("emprestimo")
         .select("id_emprestimo")
@@ -271,12 +270,11 @@ export default function BooksManagement({ mode }) {
         return;
       }
 
-      // Conclui o empréstimo
       const { error: erroAtualiza } = await supabase
         .from("emprestimo")
         .update({
-          status:       "devolvido",
-          data_retorno: new Date().toISOString().split("T")[0],
+          status:        "devolvido",
+          data_retorno:  new Date().toISOString().split("T")[0],
           atualizado_em: new Date().toISOString(),
         })
         .eq("id_emprestimo", emprestimo.id_emprestimo);
@@ -284,7 +282,7 @@ export default function BooksManagement({ mode }) {
       if (erroAtualiza) throw erroAtualiza;
 
       setMsg({ tipo: "sucesso", texto: `"${row.titulo}" devolvido com sucesso.` });
-      await carregarLivros();
+      await carregarLivros(modoEdicao);
     } catch (error) {
       setMsg({ tipo: "erro", texto: `Erro ao retornar livro: ${error.message}` });
     }
@@ -296,14 +294,14 @@ export default function BooksManagement({ mode }) {
     {
       label:       "Emprestar",
       buttonLabel: "Emprestar",
-      buttonColor: "#0e7490",   // cyan-700
+      buttonColor: "#0e7490",
       showWhen:    { key: "status", value: "Reservado" },
       onClick:     handleEmpresitar,
     },
     {
       label:       "Retornar",
       buttonLabel: "Retornar",
-      buttonColor: "#b45309",   // amber-700
+      buttonColor: "#b45309",
       showWhen:    { key: "status", value: "Emprestado" },
       onClick:     handleRetornar,
     },
@@ -336,7 +334,8 @@ export default function BooksManagement({ mode }) {
           onRowSelect={setSelectedRowIndex}
           comboboxConfig={COMBOBOX_ACERVO}
           columnLabels={LABELS_ACERVO}
-          allowNewRow={isLibrarian}
+          allowNewRow={false}
+          readOnlyColumns={isLibrarian ? ["status"] : []}
           extraColumns={extraColumns}
         />
       </div>
@@ -344,7 +343,7 @@ export default function BooksManagement({ mode }) {
       <div className="absolute bottom-6 left-6 flex gap-4 z-30">
         {isLibrarian && (
           !modoEdicao ? (
-            <Botao corFundo="#2563eb" onClick={() => setModoEdicao(true)}>
+            <Botao corFundo="#2563eb" onClick={handleEntrarEdicao}>
               Editar Planilha
             </Botao>
           ) : (
