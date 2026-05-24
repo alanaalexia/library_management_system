@@ -67,6 +67,33 @@ const TEMPLATES: Record<string, (dados: Record<string, string>) => { assunto: st
     `,
   }),
 
+
+  cobranca_devolucao: ({ nome, titulo, isbn, prazo }) => ({
+    assunto: `⚠️ Lembrete de devolução — ${titulo}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0f172a; color: #f1f5f9; border-radius: 12px;">
+        <h1 style="color: #60a5fa; font-size: 22px; margin-bottom: 8px;">Bibliotheca+</h1>
+        <h2 style="font-size: 18px; margin-bottom: 16px;">Lembrete de devolução ⚠️</h2>
+        <p style="color: #cbd5e1; line-height: 1.6;">Olá, <strong>${nome}</strong>!</p>
+        <p style="color: #cbd5e1; line-height: 1.6;">
+          O prazo de devolução do livro abaixo está se aproximando.
+          Por favor, devolva-o na biblioteca até a data indicada para evitar suspensão da conta.
+        </p>
+        <div style="background: #1e293b; border: 1px solid #f87171; border-radius: 8px; padding: 20px; margin: 24px 0;">
+          <p style="margin: 0 0 8px; color: #cbd5e1;"><strong style="color: #f1f5f9;">Livro:</strong> ${titulo}</p>
+          <p style="margin: 0 0 8px; color: #cbd5e1;"><strong style="color: #f1f5f9;">ISBN:</strong> ${isbn}</p>
+          <p style="margin: 0; color: #f87171;"><strong style="color: #f1f5f9;">Devolver até:</strong> ${prazo}</p>
+        </div>
+        <p style="color: #cbd5e1; line-height: 1.6; font-size: 14px;">
+          Caso já tenha devolvido o livro, desconsidere este e-mail.
+        </p>
+        <p style="margin-top: 32px; font-size: 12px; color: #475569;">
+          Dúvidas? Entre em contato com a biblioteca.
+        </p>
+      </div>
+    `,
+  }),
+
   // Exemplos de templates futuros — descomente e adapte quando precisar:
   // cadastro_rejeitado: ({ nome }) => ({ ... }),
   // conta_suspensa: ({ nome }) => ({ ... }),
