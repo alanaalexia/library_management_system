@@ -135,7 +135,8 @@ export default function BaseTable({
   const shouldShowButton = (extraCol, row) => {
     if (!extraCol.showWhen) return true;
     const { key, value } = extraCol.showWhen;
-    return row[key] === value;
+    // value pode ser string ou array de strings
+    return Array.isArray(value) ? value.includes(row[key]) : row[key] === value;
   };
 
   return (

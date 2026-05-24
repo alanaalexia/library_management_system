@@ -261,7 +261,7 @@ export default function BooksManagement({ mode }) {
         .from("emprestimo")
         .select("id_emprestimo")
         .eq("id_livro", row.id_livro)
-        .eq("status", "ativo")
+        .in("status", ["ativo", "atrasado"])
         .maybeSingle();
 
       if (erroEmprestimo) throw erroEmprestimo;
@@ -302,7 +302,7 @@ export default function BooksManagement({ mode }) {
       label:       "Retornar",
       buttonLabel: "Retornar",
       buttonColor: "#b45309",
-      showWhen:    { key: "status", value: "Emprestado" },
+      showWhen:    { key: "status", value: ["Emprestado", "Atrasado"] },
       onClick:     handleRetornar,
     },
   ] : [];
