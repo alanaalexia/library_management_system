@@ -36,7 +36,7 @@ export default function StudentMyBooks() {
   const [msg, setMsg]             = useState({ tipo: "", texto: "" });
 
   // Modal de cancelamento
-  const [confirmandoCancelar, setConfirmandoCancelar] = useState(null); // reserva obj
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(null);
   const [cancelando, setCancelando]                   = useState(false);
 
   const carregarMeusLivros = useCallback(async () => {
@@ -72,7 +72,7 @@ export default function StudentMyBooks() {
           .from("emprestimo")
           .select("id_emprestimo, status, prazo_devolucao, livro(isbn, titulo, autor, editora, idioma)")
           .eq("id_cliente", id)
-          .eq("status", "ativo"),
+          .in("status", ["ativo", "atrasado"]), // ← inclui atrasados
       ]);
 
       if (erroReservas)    throw erroReservas;
@@ -103,7 +103,7 @@ export default function StudentMyBooks() {
         editora: e.livro?.editora ?? "",
         idioma:  e.livro?.idioma  ?? "",
         tipo:    "Empréstimo",
-        status:  "Emprestado",
+        status:  e.status === "atrasado" ? "Atrasado" : "Emprestado", // ← exibe Atrasado
         prazo:   formatarData(e.prazo_devolucao),
       }));
 
@@ -203,8 +203,8 @@ export default function StudentMyBooks() {
                       {clienteId && (
                         <ReenviarQRCode
                           reserva={{
-                            id_reserva:    row._id_reserva,
-                            id_livro:      row._id_livro,
+                            id_reserva:     row._id_reserva,
+                            id_livro:       row._id_livro,
                             prazo_validade: row._prazo_raw,
                           }}
                           clienteId={clienteId}
