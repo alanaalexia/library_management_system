@@ -18,15 +18,15 @@ export const getEstudantesComAtrasados = async () => {
 };
 
 /**
- * Conta quantos estudantes estão com cadastro Pendente de aprovação
- * @returns {Promise<number>} Quantidade de pessoas com papel 'cliente' e status 'Pendente'
+ * Conta quantos estudantes estão com cadastro pendente de aprovação
+ * @returns {Promise<number>} Quantidade de pessoas com papel 'cliente' e status 'pendente'
  */
-export const getEstudantesPendentes = async () => {
+export const getEstudantespendentes = async () => {
   const { count, error } = await supabase
     .from('pessoa')
     .select('id_pessoa', { count: 'exact' })
     .eq('papel', 'cliente')
-    .eq('status', 'Pendente');
+    .eq('status', 'pendente');
 
   if (error) throw error;
   return count || 0;
@@ -36,7 +36,7 @@ export const getEstudantesPendentes = async () => {
  * Conta quantos estudantes estão suspensos
  * @returns {Promise<number>} Quantidade de pessoas com papel 'cliente' e status 'suspenso'
  */
-export const getEstudantesSuspensos = async () => {
+export const getEstudantessuspensos = async () => {
   const { count, error } = await supabase
     .from('pessoa')
     .select('id_pessoa', { count: 'exact' })
@@ -53,9 +53,9 @@ export const getEstudantesSuspensos = async () => {
  */
 export const getDadosBibliotecarioHome = async () => {
   const [pendingConfirmation, overdue, suspended] = await Promise.all([
-    getEstudantesPendentes(),
+    getEstudantespendentes(),
     getEstudantesComAtrasados(),
-    getEstudantesSuspensos(),
+    getEstudantessuspensos(),
   ]);
 
   return {

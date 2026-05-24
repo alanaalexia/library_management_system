@@ -82,7 +82,7 @@ export function AuthProvider({ children }) {
             try {
               if (session?.user) {
                 const profile = await fetchProfile(session.user);
-                if (profile && profile.status === 'Ativo') {
+                if (profile && profile.status === 'ativo') {
                   await marcarLogadoBibliotecario(profile);
                   setUser({ ...session.user, ...profile });
                 } else {

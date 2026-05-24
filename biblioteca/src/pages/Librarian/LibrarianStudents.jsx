@@ -15,8 +15,8 @@ const LABELS = {
 
 const COMBOBOX = {
   status: {
-    options: ["Pendente", "Ativo", "Rejeitado", "Banido"],
-    default: "Pendente",
+    options: ["pendente", "ativo", "rejeitado", "banido"],
+    default: "pendente",
   },
 };
 
@@ -113,7 +113,7 @@ export default function LibrarianStudents() {
         .map(({ id_pessoa, criado_em, atualizado_em, ...resto }) => ({
           ...resto,
           papel: "cliente",
-          status: resto.status || "Pendente",
+          status: resto.status || "pendente",
         }));
 
       for (const linha of linhasExistentes) {
@@ -125,7 +125,7 @@ export default function LibrarianStudents() {
         if (error) throw error;
 
         const original = dadosOriginais.find(d => d.id_pessoa === id_pessoa);
-        const foiAtivadoAgora = original?.status !== 'Ativo' && campos.status === 'Ativo';
+        const foiAtivadoAgora = original?.status !== 'ativo' && campos.status === 'ativo';
 
         if (foiAtivadoAgora) {
           try {
@@ -188,7 +188,7 @@ export default function LibrarianStudents() {
             comboboxConfig={COMBOBOX}
             columnLabels={LABELS}
             allowNewRow={false}
-            readOnlyCells={(row, col) => col === "status" && row.status === "Suspenso"}
+            readOnlyCells={(row, col) => col === "status" && row.status === "suspenso"}
           />
         </div>
 

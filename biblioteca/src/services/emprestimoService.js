@@ -38,7 +38,7 @@ export const getQuantidadeLivrosAtraso = async (idCliente) => {
 };
 
 /**
- * Busca todos os empréstimos Ativos (não devolvidos) do aluno com informações de prazo
+ * Busca todos os empréstimos ativos (não devolvidos) do aluno com informações de prazo
  * @param {string} idCliente - ID do cliente (aluno)
  * @returns {Promise<Array>} Lista de empréstimos com título e dias restantes/atrasados
  */
@@ -52,7 +52,7 @@ export const getAlertsEmprestimos = async (idCliente) => {
       livro:id_livro(titulo)
     `)
     .eq('id_cliente', idCliente)
-    .in('status', ['Ativo', 'atrasado'])
+    .in('status', ['ativo', 'atrasado'])
     .order('prazo_devolucao', { ascending: true });
 
   if (error) throw error;
@@ -78,17 +78,17 @@ export const getAlertsEmprestimos = async (idCliente) => {
 };
 
 /**
- * Busca a quantidade de livros em posse do aluno (empréstimos Ativos + reservas ativas)
+ * Busca a quantidade de livros em posse do aluno (empréstimos ativos + reservas ativas)
  * @param {string} idCliente - ID do cliente (aluno)
  * @returns {Promise<number>} Quantidade de livros em posse
  */
 export const getQuantidadeLivrosEmPosse = async (idCliente) => {
-  // Contar empréstimos Ativos
+  // Contar empréstimos ativos
   const { count: emprestimoCount, error: emprestimoError } = await supabase
     .from('emprestimo')
     .select('id_emprestimo', { count: 'exact' })
     .eq('id_cliente', idCliente)
-    .eq('status', 'Ativo');
+    .eq('status', 'ativo');
 
   if (emprestimoError) throw emprestimoError;
 

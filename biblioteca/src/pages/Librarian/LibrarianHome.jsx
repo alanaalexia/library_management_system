@@ -16,12 +16,12 @@ const LibrarianHome = ({ userProfile }) => {
       try {
         setLoading(true);
 
-        // Contagem de estudantes Pendentes de confirmação
+        // Contagem de estudantes pendentes de confirmação
         const { count: pendingCount, error: errorPending } = await supabase
           .from('pessoa')
           .select('*', { count: 'exact', head: true })
           .eq('papel', 'cliente')
-          .eq('status', 'Pendente');
+          .eq('status', 'pendente');
 
         // Contagem de estudantes com empréstimos atrasados
         const { data: atrasados, error: errorOverdue } = await supabase
@@ -34,7 +34,7 @@ const LibrarianHome = ({ userProfile }) => {
           .from('pessoa')
           .select('*', { count: 'exact', head: true })
           .eq('papel', 'cliente')
-          .in('status', ['Suspenso', 'Banido']);
+          .in('status', ['suspenso', 'banido']);
 
         if (!errorPending) setPendingStudents(pendingCount || 0);
         if (!errorOverdue) {
