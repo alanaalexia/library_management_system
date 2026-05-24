@@ -17,18 +17,19 @@ export const AlertItem = ({ daysLeft, bookTitle, loading = false }) => {
     );
   }
 
-  const isOverdue = daysLeft < 0;
-  const dias = Math.abs(daysLeft);
+  const daysAdjusted = daysLeft + 1; // compensa desvio de fuso
+  const isOverdue = daysAdjusted < 0;
+  const dias = Math.abs(daysAdjusted);
   const diaLabel = dias === 1 ? 'dia' : 'dias';
 
   const label = isOverdue
-    ? `${dias} ${diaLabel} de atraso em "${bookTitle}".`
-    : daysLeft === 0
+    ? `de atraso em "${bookTitle}".`
+    : daysAdjusted === 0
     ? `"${bookTitle}" deve ser devolvido hoje!`
-    : `${dias} ${diaLabel} restante${dias === 1 ? '' : 's'} para devolver "${bookTitle}".`;
+    : `${diaLabel} restante${dias === 1 ? '' : 's'} para devolver "${bookTitle}".`;
 
-  const color = isOverdue || daysLeft === 0 ? 'text-red-400' : 'text-yellow-400';
-  const numero = isOverdue ? `+${dias}` : daysLeft === 0 ? '!' : dias;
+  const color = isOverdue || daysAdjusted === 0 ? 'text-red-400' : 'text-yellow-400';
+  const numero = isOverdue ? `+${dias}` : daysAdjusted === 0 ? '!' : dias;
 
   return (
     <div className="flex items-start gap-2 py-1 text-sm">
