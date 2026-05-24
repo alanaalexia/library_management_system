@@ -5,6 +5,7 @@ import LibrarianHome from "./pages/Librarian/LibrarianHome.jsx";
 import StudentHome from "./pages/Student/StudentHome.jsx";
 import LibrarianBooks from "./pages/Librarian/LibrarianBooks.jsx";
 import StudentBooks from "./pages/Student/StudentBooks.jsx";
+import StudentMyBooks from "./pages/Student/StudentMyBooks.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import LibrarianStudents from "./pages/Librarian/LibrarianStudents.jsx";
 
@@ -58,6 +59,15 @@ export default function App() {
               ) : (
                 <StudentBooks />
               )}
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/meus-livros"
+          element={
+            <ProtectedRoute user={user && user.status === 'Ativo' ? user : null} requiredRole="cliente">
+              <StudentMyBooks />
             </ProtectedRoute>
           }
         />
