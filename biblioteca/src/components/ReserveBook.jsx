@@ -12,16 +12,12 @@ import { enviarQRCode } from '../services/qrcodeService';
  *  - onSuccess  {function} callback chamado após reserva bem-sucedida
  */
 export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
-  const [loading, setLoading]       = useState(false);
-  const [erro, setErro]             = useState(null);
-  const [sucesso, setSucesso]       = useState(false);
+  const [loading, setLoading]           = useState(false);
+  const [erro, setErro]                 = useState(null);
+  const [sucesso, setSucesso]           = useState(false);
   const [emailEnviado, setEmailEnviado] = useState(false);
-  const [emailErro, setEmailErro]   = useState(false);
+  const [emailErro, setEmailErro]       = useState(false);
 
-  /**
-   * Monta YYYY-MM-DD usando a data LOCAL do usuário (sem conversão UTC).
-   * Evita desvio de fuso (ex: Brasília UTC-3 virava um dia antes).
-   */
   function calcularPrazoValidade() {
     const data = new Date();
     data.setDate(data.getDate() + 5);
@@ -61,10 +57,11 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         return;
       }
 
-      // 2. Elegibilidade + contagem de reservas (em paralelo)
+      // 2. Elegibilidade + contagem de livros ativos (em paralelo)
       const [
         { data: clienteData, error: erroCliente },
-        { count: totalReservas, error: erroContagem },
+        { count: totalReservas,   error: erroContaReservas },
+        { count: totalEmprestimos, error: erroContaEmprestimos },
       ] = await Promise.all([
         supabase
           .from('cliente')
@@ -76,10 +73,16 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
           .select('*', { count: 'exact', head: true })
           .eq('id_cliente', clienteId)
           .in('status', ['pendente', 'ativa']),
+        supabase
+          .from('emprestimo')
+          .select('*', { count: 'exact', head: true })
+          .eq('id_cliente', clienteId)
+          .in('status', ['ativo', 'atrasado']),
       ]);
 
-      if (erroCliente)  throw erroCliente;
-      if (erroContagem) throw erroContagem;
+      if (erroCliente)          throw erroCliente;
+      if (erroContaReservas)    throw erroContaReservas;
+      if (erroContaEmprestimos) throw erroContaEmprestimos;
 
       if (clienteData.esta_banido) {
         setErro('Sua conta está banida. Entre em contato com a biblioteca.');
@@ -96,8 +99,9 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
         }
       }
 
-      if (totalReservas >= 2) {
-        setErro('Você já possui 2 reservas ativas. Devolva ou aguarde o vencimento de uma antes de reservar outro livro.');
+      // Limite: reservas ativas + empréstimos ativos/atrasados < 2
+      if ((totalReservas + totalEmprestimos) >= 2) {
+        setErro('Você já possui 2 livros ativos (emprestados, atrasados ou reservados). Devolva um antes de fazer nova reserva.');
         return;
       }
 
@@ -129,7 +133,7 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
       setSucesso(true);
       onSuccess?.();
 
-      // 6. Envia QR code — falha não bloqueia o fluxo, mas atualiza o estado do email
+      // 6. Envia QR code — falha não bloqueia o fluxo
       enviarQRCode({
         id_cliente:    clienteId,
         id_reserva:    novaReserva.id_reserva,
@@ -165,7 +169,6 @@ export default function ReserveBook({ livro, clienteId, onClose, onSuccess }) {
             <span className="text-white font-medium">{livro.titulo}</span> foi reservado com sucesso.
           </p>
 
-          {/* Status do envio do QR code */}
           {!emailEnviado && !emailErro && (
             <div className="bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 mb-6 text-left">
               <p className="text-slate-400 text-sm flex items-center gap-2">

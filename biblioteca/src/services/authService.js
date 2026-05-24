@@ -29,8 +29,8 @@ const validarAcesso = async (profile) => {
     const mensagens = {
       'Pendente':  'Seu cadastro está aguardando aprovação do bibliotecário.',
       'Rejeitado': 'Seu cadastro foi rejeitado pelo bibliotecário. Entre em contato para mais informações.',
-      'Suspenso':  'Sua conta está suspensa. Entre em contato com um bibliotecário.',
-      'Banido':    'Sua conta foi banida por 30 dias devido à não devolução de livros dentro do prazo.',
+      'Suspenso':  'Sua conta está suspensa por 30 dias devido à não devolução de livros.',
+      'Banido':    'Sua conta foi banida. Entre em contato com um bibliotecário.',
     };
     throw new Error(mensagens[profile.status] ?? 'Acesso não autorizado. Entre em contato com o bibliotecário.');
   }
