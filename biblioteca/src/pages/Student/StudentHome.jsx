@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { ActionCard } from '../../components/dashboard/ActionCard';
 import { AlertItem } from '../../components/dashboard/AlertItem';
 import StudentHeader from './StudentHeader';
+import { getDadosAlunoHome } from '../../services/emprestimoService';
 import { supabase } from '../../services/supabaseClient';
 
 const StudentHome = ({ userProfile }) => {
   const navigate = useNavigate();
-  const [loading, setLoading]           = useState(true);
-  const [atrasados, setAtrasados]       = useState(0);
-  const [emprestados, setEmprestados]   = useState(0);
-  const [reservados, setReservados]     = useState(0);
-  const [alerts, setAlerts]             = useState([]);
+  const [overdueBooks, setOverdueBooks] = useState(0);
+  const [alerts, setAlerts] = useState([]);
+  const [booksInPossession, setBooksInPossession] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -19,61 +19,30 @@ const StudentHome = ({ userProfile }) => {
         setLoading(true);
 
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        console.log("user.id:", user?.id);
 
-        const { data: cliente } = await supabase
+        if (!user) {
+          console.error('Usuário não autenticado');
+          return;
+        }
+
+        const { data: cliente, error: erroCliente } = await supabase
           .from('cliente')
           .select('id_cliente')
           .eq('id_pessoa', user.id)
           .maybeSingle();
 
-        if (!cliente) return;
+        console.log("cliente:", cliente, "erroCliente:", erroCliente);
 
-        const clienteId = cliente.id_cliente;
+        if (!cliente) {
+          console.error('Cliente não encontrado');
+          return;
+        }
 
-        // Marca empréstimos atrasados antes de buscar
-        await supabase.rpc('marcar_emprestimos_atrasados');
-
-        // Busca empréstimos ativos e atrasados
-        const { data: emprestimos } = await supabase
-          .from('emprestimo')
-          .select('id_emprestimo, status, prazo_devolucao, livro(titulo)')
-          .eq('id_cliente', clienteId)
-          .in('status', ['ativo', 'atrasado']);
-
-        // Busca reservas ativas
-        const { data: reservas } = await supabase
-          .from('reserva')
-          .select('id_reserva, prazo_validade, livro(titulo)')
-          .eq('id_cliente', clienteId)
-          .eq('status', 'ativa');
-
-        const listaEmprestimos = emprestimos || [];
-        const listaReservas    = reservas    || [];
-
-        const qtdAtrasados  = listaEmprestimos.filter(e => e.status === 'atrasado').length;
-        const qtdEmprestados = listaEmprestimos.filter(e => e.status === 'ativo').length;
-        const qtdReservados  = listaReservas.length;
-
-        setAtrasados(qtdAtrasados);
-        setEmprestados(qtdEmprestados);
-        setReservados(qtdReservados);
-
-        // Alertas: empréstimos com prazo nos próximos 5 dias
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        const alertasList = listaEmprestimos
-          .filter(e => e.status === 'ativo')
-          .map(e => {
-            const prazo = new Date(e.prazo_devolucao);
-            prazo.setHours(0, 0, 0, 0);
-            const diasRestantes = Math.ceil((prazo - hoje) / (1000 * 60 * 60 * 24));
-            return { daysLeft: diasRestantes, bookTitle: e.livro?.titulo ?? 'Livro' };
-          })
-          .filter(a => a.daysLeft <= 5)
-          .sort((a, b) => a.daysLeft - b.daysLeft);
-
-        setAlerts(alertasList);
+        const dados = await getDadosAlunoHome(cliente.id_cliente);
+        setOverdueBooks(dados.overdueBooks);
+        setAlerts(dados.alerts);
+        setBooksInPossession(dados.booksInPossession);
       } catch (error) {
         console.error('Erro ao carregar dados do aluno:', error);
       } finally {
@@ -83,9 +52,6 @@ const StudentHome = ({ userProfile }) => {
 
     carregarDados();
   }, []);
-
-  // Helpers de pluralização
-  const palavra = (n, singular, pluralStr) => n === 1 ? singular : pluralStr;
 
   return (
     <div
@@ -98,6 +64,7 @@ const StudentHome = ({ userProfile }) => {
     >
       <div className="absolute inset-0 bg-black/60" />
 
+      {/* Cabeçalho do estudante parametrizado com navegação e logout */}
       <StudentHeader />
 
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-6 text-center px-4 py-8">
@@ -116,39 +83,19 @@ const StudentHome = ({ userProfile }) => {
         </div>
 
         <div className="bg-black/50 border border-white/10 rounded-md px-6 py-4 text-left min-w-[260px]">
-
-          {/* Atrasados */}
           <div className="flex items-center gap-2 py-1 text-sm mb-1">
             <span className="font-semibold text-red-400">
-              {loading ? '—' : atrasados}
+              {loading ? '—' : overdueBooks}
             </span>
-            <span className="text-white/90">
-              {loading ? 'livro(s) atrasado(s).' : palavra(atrasados, 'livro atrasado.', 'livros atrasados.')}
-            </span>
+            <span className="text-white/90">Livro(s) em atraso.</span>
           </div>
-
-          {/* Emprestados */}
-          <div className="flex items-center gap-2 py-1 text-sm mb-1">
-            <span className="font-semibold text-blue-400">
-              {loading ? '—' : emprestados}
-            </span>
-            <span className="text-white/90">
-              {loading ? 'livro(s) emprestado(s).' : palavra(emprestados, 'livro emprestado.', 'livros emprestados.')}
-            </span>
-          </div>
-
-          {/* Reservados */}
           <div className="flex items-center gap-2 py-1 text-sm mb-2">
-            <span className="font-semibold text-yellow-400">
-              {loading ? '—' : reservados}
+            <span className="font-semibold text-blue-400">
+              {loading ? '—' : booksInPossession}
             </span>
-            <span className="text-white/90">
-              {loading ? 'livro(s) reservado(s).' : palavra(reservados, 'livro reservado.', 'livros reservados.')}
-            </span>
+            <span className="text-white/90">Livro(s) em posse.</span>
           </div>
-
-          {/* Alertas de prazo */}
-          {!loading && alerts.length === 0 ? (
+          {alerts.length === 0 && !loading ? (
             <p className="text-white/70 text-sm py-2">Nenhum aviso de devolução.</p>
           ) : (
             alerts.map((alert, index) => (
