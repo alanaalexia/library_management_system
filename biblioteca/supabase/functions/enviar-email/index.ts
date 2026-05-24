@@ -28,6 +28,24 @@ const TEMPLATES: Record<string, (dados: Record<string, string>) => { assunto: st
     `,
   }),
 
+  cadastro_rejeitado: ({ nome }) => ({
+    assunto: "Seu cadastro não foi aprovado — Bibliotheca+",
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0f172a; color: #f1f5f9; border-radius: 12px;">
+        <h1 style="color: #60a5fa; font-size: 22px; margin-bottom: 8px;">Bibliotheca+</h1>
+        <h2 style="font-size: 18px; margin-bottom: 16px;">Cadastro não aprovado</h2>
+        <p style="color: #cbd5e1; line-height: 1.6;">Olá, <strong>${nome}</strong>!</p>
+        <p style="color: #cbd5e1; line-height: 1.6;">
+          Infelizmente seu cadastro foi <strong style="color: #f87171;">rejeitado</strong> pelo bibliotecário.
+          Entre em contato com a biblioteca para obter mais informações.
+        </p>
+        <p style="margin-top: 32px; font-size: 12px; color: #475569;">
+          Se você acredita que isso foi um engano, procure a biblioteca pessoalmente.
+        </p>
+      </div>
+    `,
+  }),
+
   qrcode_reserva: ({ nome, titulo, isbn, prazo_validade, qrCodeUrl }) => ({
     assunto: `📚 Seu QR code de reserva — ${titulo}`,
     html: `

@@ -125,13 +125,23 @@ export default function LibrarianStudents() {
         if (error) throw error;
 
         const original = dadosOriginais.find(d => d.id_pessoa === id_pessoa);
-        const foiAtivadoAgora = original?.status !== 'Ativo' && campos.status === 'Ativo';
+
+        const foiAtivadoAgora   = original?.status !== 'Ativo'      && campos.status === 'Ativo';
+        const foiRejeitadoAgora = original?.status !== 'Rejeitado'  && campos.status === 'Rejeitado';
 
         if (foiAtivadoAgora) {
           try {
             await enviarEmail('cadastro_aprovado', linha.email, { nome: linha.nome });
           } catch (emailErr) {
-            console.warn(`[LibrarianStudents] Falha ao enviar email para ${linha.email}:`, emailErr.message);
+            console.warn(`[LibrarianStudents] Falha ao enviar email de aprovação para ${linha.email}:`, emailErr.message);
+          }
+        }
+
+        if (foiRejeitadoAgora) {
+          try {
+            await enviarEmail('cadastro_rejeitado', linha.email, { nome: linha.nome });
+          } catch (emailErr) {
+            console.warn(`[LibrarianStudents] Falha ao enviar email de rejeição para ${linha.email}:`, emailErr.message);
           }
         }
       }
